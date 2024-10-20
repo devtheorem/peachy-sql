@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.0.0] - 2024-10-29
+### Added
+- Official support for PostgreSQL.
+- It is now possible to bind and set binary column values in a prepared statement which is executed multiple times.
+
+### Changed
+- Rewrote library using PDO instead of driver-specific connection objects.
+Rather than instantiating a `Mysql` or `SqlServer` subclass, simply construct
+`PeachySql` with the PDO object for your connection.
+- Moved to `DevTheorem` namespace.
+
+> [!IMPORTANT]
+> If using SQL Server, make sure your PDO connection has the `PDO::SQLSRV_ATTR_FETCHES_NUMERIC_TYPE`
+> option set to `true`, so column values are returned with the same native types as before.
+
+- When using MySQL, the `Statement` object no longer has a `getInsertId()` method.
+This does not affect shorthand insert methods, however, which provide the insert IDs just like before.
+- The `getAffected()` method on a select query result now returns the number of selected rows instead of `-1` for MySQL.
+- PHP 8.1+ is now required.
+
+### Removed
+- All previously deprecated methods.
+- Unnecessary `$length` parameter from `makeBinaryParam()`.
+- `SqlException` no longer has properties for the failed query and params.
+
+
 ## [6.3.1] - 2024-10-13
 ### Changed
 - Improved `makeBinaryParam()` implementation for SQL Server.
@@ -66,13 +92,12 @@ bound params in the base select query.
 ## [5.5.1] Differentiated Bit - 2017-11-09
 ### Added
 - Support for using `makeBinaryParam()` with nullable columns
-(issue [#5](https://github.com/theodorejb/peachy-sql/issues/5)).
+(issue [#5](https://github.com/devtheorem/peachy-sql/issues/5)).
 
 
 ## [5.5.0] Null Appreciation - 2017-10-19
 ### Added
-- New `nu` and `nn` shorthand operators to filter where a column is or
-is not null.
+- New `nu` and `nn` shorthand operators to filter where a column is or is not null.
 
 ### Deprecated
 - Ability to use null values with `eq` and `ne` operators.
@@ -83,26 +108,22 @@ is not null.
 - `makeBinaryParam()` method.
 
 ### Fixed
-- `Statement::getAffected()` method now consistently returns -1 when no
-affected count is available.
+- `Statement::getAffected()` method now consistently returns -1 when no affected count is available.
 - "Incorrect integer value" MySQL error when binding a false value.
 
 
 ## [5.3.1] Deprecation Proclamation - 2017-01-31
 ### Changed
-- Updated readme to document `offset()` method instead of deprecated
-`paginate()` method.
+- Updated readme to document `offset()` method instead of deprecated `paginate()` method.
 
 ### Deprecated
 - Unnecessary option getter/setter methods (`setTable()`, `getTable()`,
-`setAutoIncrementValue()`, `getAutoIncrementValue()`, `setIdColumn()`,
-`getIdColumn()`).
+`setAutoIncrementValue()`, `getAutoIncrementValue()`, `setIdColumn()`, `getIdColumn()`).
 
 
 ## [5.3.0] Descending Increase - 2016-11-04
 ### Added
-- `Selector::offset()` method to enable setting an offset that isn't a
-multiple of the page size.
+- `Selector::offset()` method to enable setting an offset that isn't a multiple of the page size.
 
 ### Deprecated
 - `Selector::paginate()` method.
@@ -110,8 +131,7 @@ multiple of the page size.
 
 ## [5.2.3] Protracted Refinement - 2016-08-28
 ### Added
-- Support for generating filters with IS NOT NULL and multiple LIKE
-operators.
+- Support for generating filters with IS NOT NULL and multiple LIKE operators.
 
 
 ## [5.2.2] Chainable Reparation - 2016-08-25
@@ -124,8 +144,7 @@ operators.
 
 ## [5.2.1] Simple Safety - 2016-07-21
 ### Changed
-- An exception is now thrown when attempting to use pagination without
-sorting rows.
+- An exception is now thrown when attempting to use pagination without sorting rows.
 - Qualified column identifiers are now automatically escaped. As a
 consequence, column names containing periods are no longer supported.
 
@@ -139,8 +158,7 @@ and also removes the need for implementation-specific options. The new
 `selectFrom()` method also supports pagination and more complex sorting/filtering.
 
 ### Deprecated
-- Old shorthand methods (`select()`, `insertBulk()`, `insertOne()`, `update()`,
-and `delete()`)
+- Old shorthand methods (`select()`, `insertBulk()`, `insertOne()`, `update()`, and `delete()`)
 
 
 ## [5.1.0] Futuristic Resourcefulness - 2016-04-15
@@ -165,10 +183,9 @@ to run the prepared query multiple times with different values.
 ### Changed
 - Column names are now automatically escaped, so shorthand methods can
 be used without having to specify a list of valid columns.
-- Rather than passing options to the PeachySQL constructor as an
-associative array, an `Options` subclass should be passed instead.
-This object has setters and getters for each setting, which improves
-discoverability and refactoring.
+- Rather than passing options to the PeachySQL constructor as an associative array,
+an `Options` subclass should be passed instead. This object has setters and getters
+for each setting, which improves discoverability and refactoring.
 
 ### Removed
 - `setConnection()` and `setOptions()` methods. Options can still be
@@ -182,7 +199,7 @@ increment value was altered.
 ## [4.0.2] Preparatory Fixture - 2015-05-11
 ### Fixed
 - Missing error info for MySQL prepared statement failures
-(issue [#4](https://github.com/theodorejb/peachy-sql/issues/4)).
+(issue [#4](https://github.com/devtheorem/peachy-sql/issues/4)).
 
 ### Removed
 - Unnecessary `SqlResult::getQuery()` method.
@@ -196,22 +213,18 @@ increment value was altered.
 
 ## [4.0.0] Economical Alternator - 2015-02-06
 ### Added
-- `SqlResult::getIterator()` method which returns a `Generator`, making
-it possible to iterate over very large result sets without running into
-memory limitations.
+- `SqlResult::getIterator()` method which returns a `Generator`, making it possible to iterate over
+very large result sets without running into memory limitations.
 - Optional third parameter on `select()` method which accepts an array of
 column names to sort by in ascending order.
-- `SqlException::getSqlState()` method which returns the standard SQLSTATE
-code for the failure.
+- `SqlException::getSqlState()` method which returns the standard SQLSTATE code for the failure.
 
 ### Changed
-- `SqlException::getMessage()` now includes the SQL error message for the
-failed query.
+- `SqlException::getMessage()` now includes the SQL error message for the failed query.
 - `SqlException::getCode()` now returns the MySQL or SQL Server error code.
 
 ### Removed
-- PHP 5.4 support (5.5+ is now required - recent versions of HHVM should
-also work if using MySQL).
+- PHP 5.4 support (5.5+ is now required - recent versions of HHVM should also work if using MySQL).
 - Deprecated `insert()` and `insertAssoc()` methods.
 - Deprecated `TSQL` class.
 - Ability to call `SqlResult::getFirst()` and `SqlResult::getAll()` multiple
@@ -220,15 +233,14 @@ times for a given result (since rows are no longer cached in the object).
 
 ## [3.0.1] Uniform Optimization - 2014-12-06
 ### Changed
-- Improved documentation consistency
-- Minor code cleanup and performance tweaks
+- Improved documentation consistency.
+- Minor code cleanup and performance tweaks.
 
 
 ## [3.0.0] Hyperactive Lightyear - 2014-12-02
 ### Added
-- `insertOne()` and `insertBulk()` methods, which accept an associative array
-of columns/values and return `InsertResult` and `BulkInsertResult` objects,
-respectively.
+- `insertOne()` and `insertBulk()` methods, which accept an associative array of
+columns/values and return `InsertResult` and `BulkInsertResult` objects, respectively.
 - It is now possible to bulk-insert an arbitrarily large set of rows.
 PeachySQL will automatically batch large inserts to remove limitations
 on the maximum number of bound parameters and rows per query.
@@ -242,10 +254,9 @@ The following classes have been renamed to improve API consistency:
 - `SQLResult` is now `SqlResult`
 - `MySQLResult` is now `MysqlResult`
 
-Since class and function names in PHP are case-insensitive (as are file
-names on some platforms), these renames do not necessarily break
-backwards compatibility. However, existing references should still be
-updated to avoid confusion.
+Since class and function names in PHP are case-insensitive (as are file names on some platforms),
+these renames do not necessarily break backwards compatibility. However, existing references should
+still be updated to avoid confusion.
 
 ### Deprecated
 - `insertAssoc()` method - use `insertOne()` instead.
@@ -278,17 +289,15 @@ to retrieve the error array, SQL query string, and bound parameters.
 
 ### Changed
 - The library is now namespaced under `PeachySQL`.
-- Callbacks for shorthand methods are now optional. If no callback is
-specified, the methods will return sensible defaults (e.g. `select()`
-returns selected rows, `insert()` returns insert IDs, and `update()` and
-`delete()` return the number of affected rows).
+- Callbacks for shorthand methods are now optional. If no callback is specified, the methods will
+return sensible defaults (e.g. `select()` returns selected rows, `insert()` returns insert IDs,
+and `update()` and `delete()` return the number of affected rows).
 - A list of valid columns must now be passed to the options array to
 generate queries which reference a column. This allows queries to be
 generated from user data without the potential for SQL injection attacks.
 - Callbacks are now passed a `SQLResult` object, rather than separate
 arguments for selected and affected rows.
-- Table name and identity column options are now passed to the
-constructor as an associative array.
+- Table name and identity column options are now passed to the constructor as an associative array.
 - If a flat array of values is passed to `insert()`, the insert ID will
 now be returned as an integer instead of an array.
 - Updated code to follow the [PSR-2 coding style guide](http://www.php-fig.org/psr/psr-2/).
@@ -296,16 +305,13 @@ now be returned as an integer instead of an array.
 ### Removed
 - `$dbType` argument from constructor (use `new PeachySQL\MySQL($conn)`
 or `new PeachySQL\TSQL($conn)` instead).
-- `getTableName()` and `setTableName()` methods (replaced with `getOptions()`
-and `setOptions()`).
-- `$idCol` parameter from `insert()` method (specify via options array
-instead if using SQL Server). 
+- `getTableName()` and `setTableName()` methods (replaced with `getOptions()` and `setOptions()`).
+- `$idCol` parameter from `insert()` method (specify via options array instead if using SQL Server). 
 - `splitRows()` method (not core to PeachySQL's goal). The same functionality is
 available in the [ArrayUtils library](https://github.com/theodorejb/array-utils).
 
 ## Fixed
-- Potential error when inserting into a MySQL table without an
-auto-incremented column.
+- Potential error when inserting into a MySQL table without an auto-incremented column.
 - Errors are now thrown if required table/column names aren't specified.
 
 
@@ -321,10 +327,8 @@ inserting a single row into a MySQL table with a flat array.
 ## [1.1.0] - 2014-04-11
 ### Changed
 - The `query()`, `select()`, `insert()`, `update()`, and `delete()` methods now
-return the value of their callback function, making it easier to use
-data outside the callback.
-- A flat array of values can now be passed to the `insert()` method to
-insert a single row.
+return the value of their callback function, making it easier to use data outside the callback.
+- A flat array of values can now be passed to the `insert()` method to insert a single row.
 
 
 ## [1.0.1] - 2014-03-28
@@ -338,33 +342,34 @@ insert a single row.
 - Initial release
 
 
-[6.3.1]: https://github.com/theodorejb/peachy-sql/compare/v6.3.0...v6.3.1
-[6.3.0]: https://github.com/theodorejb/peachy-sql/compare/v6.2.0...v6.3.0
-[6.2.0]: https://github.com/theodorejb/peachy-sql/compare/v6.1.0...v6.2.0
-[6.1.0]: https://github.com/theodorejb/peachy-sql/compare/v6.0.3...v6.1.0
-[6.0.3]: https://github.com/theodorejb/peachy-sql/compare/v6.0.2...v6.0.3
-[6.0.2]: https://github.com/theodorejb/peachy-sql/compare/v6.0.1...v6.0.2
-[6.0.1]: https://github.com/theodorejb/peachy-sql/compare/v6.0.0...v6.0.1
-[6.0.0]: https://github.com/theodorejb/peachy-sql/compare/v5.5.1...v6.0.0
-[5.5.1]: https://github.com/theodorejb/peachy-sql/compare/v5.5.0...v5.5.1
-[5.5.0]: https://github.com/theodorejb/peachy-sql/compare/v5.4.0...v5.5.0
-[5.4.0]: https://github.com/theodorejb/peachy-sql/compare/v5.3.1...v5.4.0
-[5.3.1]: https://github.com/theodorejb/peachy-sql/compare/v5.3.0...v5.3.1
-[5.3.0]: https://github.com/theodorejb/peachy-sql/compare/v5.2.3...v5.3.0
-[5.2.3]: https://github.com/theodorejb/peachy-sql/compare/v5.2.2...v5.2.3
-[5.2.2]: https://github.com/theodorejb/peachy-sql/compare/v5.2.1...v5.2.2
-[5.2.1]: https://github.com/theodorejb/peachy-sql/compare/v5.2.0...v5.2.1
-[5.2.0]: https://github.com/theodorejb/peachy-sql/compare/v5.1.0...v5.2.0
-[5.1.0]: https://github.com/theodorejb/peachy-sql/compare/v5.0.0...v5.1.0
-[5.0.0]: https://github.com/theodorejb/peachy-sql/compare/v4.0.2...v5.0.0
-[4.0.2]: https://github.com/theodorejb/peachy-sql/compare/v4.0.1...v4.0.2
-[4.0.1]: https://github.com/theodorejb/peachy-sql/compare/v4.0.0...v4.0.1
-[4.0.0]: https://github.com/theodorejb/peachy-sql/compare/v3.0.1...v4.0.0
-[3.0.1]: https://github.com/theodorejb/peachy-sql/compare/v3.0.0...v3.0.1
-[3.0.0]: https://github.com/theodorejb/peachy-sql/compare/v2.1.0...v3.0.0
-[2.1.0]: https://github.com/theodorejb/peachy-sql/compare/v2.0.0...v2.1.0
-[2.0.0]: https://github.com/theodorejb/peachy-sql/compare/v1.1.1...v2.0.0
-[1.1.1]: https://github.com/theodorejb/peachy-sql/compare/v1.1.0...v1.1.1
-[1.1.0]: https://github.com/theodorejb/peachy-sql/compare/v1.0.1...v1.1.0
-[1.0.1]: https://github.com/theodorejb/peachy-sql/compare/v1.0.0...v1.0.1
-[1.0.0]: https://github.com/theodorejb/peachy-sql/tree/v1.0.0
+[7.0.0]: https://github.com/devtheorem/peachy-sql/compare/v6.3.1...v7.0.0
+[6.3.1]: https://github.com/devtheorem/peachy-sql/compare/v6.3.0...v6.3.1
+[6.3.0]: https://github.com/devtheorem/peachy-sql/compare/v6.2.0...v6.3.0
+[6.2.0]: https://github.com/devtheorem/peachy-sql/compare/v6.1.0...v6.2.0
+[6.1.0]: https://github.com/devtheorem/peachy-sql/compare/v6.0.3...v6.1.0
+[6.0.3]: https://github.com/devtheorem/peachy-sql/compare/v6.0.2...v6.0.3
+[6.0.2]: https://github.com/devtheorem/peachy-sql/compare/v6.0.1...v6.0.2
+[6.0.1]: https://github.com/devtheorem/peachy-sql/compare/v6.0.0...v6.0.1
+[6.0.0]: https://github.com/devtheorem/peachy-sql/compare/v5.5.1...v6.0.0
+[5.5.1]: https://github.com/devtheorem/peachy-sql/compare/v5.5.0...v5.5.1
+[5.5.0]: https://github.com/devtheorem/peachy-sql/compare/v5.4.0...v5.5.0
+[5.4.0]: https://github.com/devtheorem/peachy-sql/compare/v5.3.1...v5.4.0
+[5.3.1]: https://github.com/devtheorem/peachy-sql/compare/v5.3.0...v5.3.1
+[5.3.0]: https://github.com/devtheorem/peachy-sql/compare/v5.2.3...v5.3.0
+[5.2.3]: https://github.com/devtheorem/peachy-sql/compare/v5.2.2...v5.2.3
+[5.2.2]: https://github.com/devtheorem/peachy-sql/compare/v5.2.1...v5.2.2
+[5.2.1]: https://github.com/devtheorem/peachy-sql/compare/v5.2.0...v5.2.1
+[5.2.0]: https://github.com/devtheorem/peachy-sql/compare/v5.1.0...v5.2.0
+[5.1.0]: https://github.com/devtheorem/peachy-sql/compare/v5.0.0...v5.1.0
+[5.0.0]: https://github.com/devtheorem/peachy-sql/compare/v4.0.2...v5.0.0
+[4.0.2]: https://github.com/devtheorem/peachy-sql/compare/v4.0.1...v4.0.2
+[4.0.1]: https://github.com/devtheorem/peachy-sql/compare/v4.0.0...v4.0.1
+[4.0.0]: https://github.com/devtheorem/peachy-sql/compare/v3.0.1...v4.0.0
+[3.0.1]: https://github.com/devtheorem/peachy-sql/compare/v3.0.0...v3.0.1
+[3.0.0]: https://github.com/devtheorem/peachy-sql/compare/v2.1.0...v3.0.0
+[2.1.0]: https://github.com/devtheorem/peachy-sql/compare/v2.0.0...v2.1.0
+[2.0.0]: https://github.com/devtheorem/peachy-sql/compare/v1.1.1...v2.0.0
+[1.1.1]: https://github.com/devtheorem/peachy-sql/compare/v1.1.0...v1.1.1
+[1.1.0]: https://github.com/devtheorem/peachy-sql/compare/v1.0.1...v1.1.0
+[1.0.1]: https://github.com/devtheorem/peachy-sql/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/devtheorem/peachy-sql/tree/v1.0.0
