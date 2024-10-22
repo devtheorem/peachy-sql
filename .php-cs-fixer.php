@@ -2,7 +2,7 @@
 
 $finder = PhpCsFixer\Finder::create()
     ->path([
-        'lib/',
+        'src/',
         'test/',
     ])
     ->ignoreVCSIgnored(true)
