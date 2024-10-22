@@ -2,36 +2,41 @@
 
 declare(strict_types=1);
 
-namespace DevTheorem\PeachySQL\Test\Mysql;
+namespace DevTheorem\PeachySQL\Test;
 
 use DevTheorem\PeachySQL\PeachySql;
-use DevTheorem\PeachySQL\Test\DbTestCase;
 use DevTheorem\PeachySQL\Test\src\App;
 use PDO;
 
 /**
- * @group mysql
+ * @group pgsql
  */
-class MysqlDbTest extends DbTestCase
+class PgsqlDbTest extends DbTestCase
 {
     private static ?PeachySql $db = null;
 
     protected function getExpectedBadSyntaxCode(): int
     {
-        return 1064;
+        return 7;
     }
 
     protected function getExpectedBadSyntaxError(): string
     {
-        return 'error in your SQL syntax';
+        return 'syntax error';
+    }
+
+    protected function getExpectedBadSqlState(): string
+    {
+        return '42601';
     }
 
     public static function dbProvider(): PeachySql
     {
         if (!self::$db) {
             $c = App::$config;
+            $dbName = getenv('POSTGRES_HOST') !== false ? 'postgres' : 'PeachySQL';
 
-            $pdo = new PDO($c->getMysqlDsn(), $c->getMysqlUser(), $c->getMysqlPassword(), [
+            $pdo = new PDO($c->getPgsqlDsn($dbName), $c->getPgsqlUser(), $c->getPgsqlPassword(), [
                 PDO::ATTR_EMULATE_PREPARES => false,
             ]);
 
@@ -46,12 +51,12 @@ class MysqlDbTest extends DbTestCase
     {
         $sql = "
             CREATE TABLE Users (
-                user_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+                user_id SERIAL PRIMARY KEY,
                 name VARCHAR(50) NOT NULL,
                 dob DATE NOT NULL,
-                weight DOUBLE NOT NULL,
+                weight REAL NOT NULL,
                 is_disabled BOOLEAN NOT NULL,
-                uuid BINARY(16) NULL
+                uuid bytea NULL
             )";
 
         $db->query("DROP TABLE IF EXISTS Users");

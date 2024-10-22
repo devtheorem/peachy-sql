@@ -2,10 +2,9 @@
 
 declare(strict_types=1);
 
-namespace DevTheorem\PeachySQL\Test\SqlServer;
+namespace DevTheorem\PeachySQL\Test;
 
 use DevTheorem\PeachySQL\PeachySql;
-use DevTheorem\PeachySQL\Test\DbTestCase;
 use DevTheorem\PeachySQL\Test\src\App;
 use PDO;
 
