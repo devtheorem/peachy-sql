@@ -106,6 +106,31 @@ abstract class DbTestCase extends TestCase
         }
     }
 
+    public function testBlob(): void
+    {
+        $db = static::dbProvider();
+        $img = file_get_contents('test/DevTheorem.png');
+
+        $id = $db->insertRow($this->table, [
+            'name' => 'DevTheorem',
+            'dob' => '2024-10-24',
+            'weight' => 0.0,
+            'is_disabled' => false,
+            'photo' => $db->makeBinaryParam($img),
+        ])->id;
+
+        /** @var array{photo: string|resource} $row */
+        $row = $db->selectFrom("SELECT photo FROM {$this->table}")
+            ->where(['user_id' => $id])->query()->getFirst();
+
+        if ($db->options->binarySelectedAsStream) {
+            /** @psalm-suppress PossiblyInvalidArgument */
+            $row['photo'] = stream_get_contents($row['photo']);
+        }
+
+        $this->assertSame(['photo' => $img], $row);
+    }
+
     public function testIteratorQuery(): void
     {
         $peachySql = static::dbProvider();
@@ -124,8 +149,8 @@ abstract class DbTestCase extends TestCase
         }
 
         $ids = $peachySql->insertRows($this->table, $insertColVals)->ids;
-        $iterator = $peachySql->selectFrom("SELECT * FROM {$this->table}")
-            ->where(['user_id' => $ids])->query()->getIterator();
+        $sql = "SELECT user_id, name, dob, weight, is_disabled, uuid FROM {$this->table}";
+        $iterator = $peachySql->selectFrom($sql)->where(['user_id' => $ids])->query()->getIterator();
 
         $this->assertInstanceOf(\Generator::class, $iterator);
         $colValsCompare = [];

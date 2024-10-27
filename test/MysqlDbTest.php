@@ -50,7 +50,8 @@ class MysqlDbTest extends DbTestCase
                 dob DATE NOT NULL,
                 weight DOUBLE NOT NULL,
                 is_disabled BOOLEAN NOT NULL,
-                uuid BINARY(16) NULL
+                uuid BINARY(16) NULL,
+                photo BLOB NULL
             )";
 
         $db->query("DROP TABLE IF EXISTS Users");

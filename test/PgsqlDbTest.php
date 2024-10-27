@@ -56,7 +56,8 @@ class PgsqlDbTest extends DbTestCase
                 dob DATE NOT NULL,
                 weight REAL NOT NULL,
                 is_disabled BOOLEAN NOT NULL,
-                uuid bytea NULL
+                uuid bytea NULL,
+                photo bytea NULL
             )";
 
         $db->query("DROP TABLE IF EXISTS Users");

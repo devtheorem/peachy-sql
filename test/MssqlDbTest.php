@@ -67,12 +67,13 @@ class MssqlDbTest extends DbTestCase
         $sql = "
             DROP TABLE IF EXISTS Users;
             CREATE TABLE Users (
-                user_id INT PRIMARY KEY IDENTITY(1,1) NOT NULL,
+                user_id INT PRIMARY KEY IDENTITY NOT NULL,
                 name NVARCHAR(50) NOT NULL,
                 dob DATE NOT NULL,
                 weight FLOAT NOT NULL,
                 is_disabled BIT NOT NULL,
-                uuid BINARY(16) NULL
+                uuid BINARY(16) NULL,
+                photo VARBINARY(max) NULL
             )";
 
         $db->query($sql);
