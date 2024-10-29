@@ -32,4 +32,25 @@ class Options
      * The character used to quote identifiers.
      */
     public string $identifierQuote = '"';
+
+    public function __construct(
+        public readonly string $driver = '',
+    ) {
+        if ($this->driver === 'sqlsrv') {
+            // https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server
+            $this->maxBoundParams = 2100 - 1;
+            $this->maxInsertRows = 1000;
+            $this->affectedIsRowCount = false;
+            $this->fetchNextSyntax = true;
+            $this->sqlsrvBinaryEncoding = true;
+            $this->multiRowset = true;
+        } elseif ($this->driver === 'mysql') {
+            $this->lastIdIsFirstOfBatch = true;
+            $this->identifierQuote = '`'; // needed since not everyone uses ANSI mode
+        } elseif ($this->driver === 'pgsql') {
+            $this->binarySelectedAsStream = true;
+            $this->nativeBoolColumns = true;
+            $this->floatSelectedAsString = true;
+        }
+    }
 }

@@ -16,33 +16,16 @@ class PeachySql
 {
     public Options $options;
     private PDO $conn;
-    private bool $usedPrepare;
+    private bool $usedPrepare = true;
 
     public function __construct(PDO $connection, ?Options $options = null)
     {
         $this->conn = $connection;
-        $this->usedPrepare = true;
 
         if ($options === null) {
+            /** @var string $driver */
             $driver = $connection->getAttribute(PDO::ATTR_DRIVER_NAME);
-            $options = new Options();
-
-            if ($driver === 'sqlsrv') {
-                // https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server
-                $options->maxBoundParams = 2100 - 1;
-                $options->maxInsertRows = 1000;
-                $options->affectedIsRowCount = false;
-                $options->fetchNextSyntax = true;
-                $options->sqlsrvBinaryEncoding = true;
-                $options->multiRowset = true;
-            } elseif ($driver === 'mysql') {
-                $options->lastIdIsFirstOfBatch = true;
-                $options->identifierQuote = '`'; // needed since not everyone uses ANSI mode
-            } elseif ($driver === 'pgsql') {
-                $options->binarySelectedAsStream = true;
-                $options->nativeBoolColumns = true;
-                $options->floatSelectedAsString = true;
-            }
+            $options = new Options($driver);
         }
 
         $this->options = $options;
