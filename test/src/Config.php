@@ -37,8 +37,18 @@ class Config
         return 'postgres';
     }
 
-    public function getSqlsrvServer(): string
+    public function getMssqlServer(): string
     {
         return '(local)\SQLEXPRESS';
+    }
+
+    public function getMssqlUsername(): string
+    {
+        return '';
+    }
+
+    public function getMssqlPassword(): string
+    {
+        return '';
     }
 }
