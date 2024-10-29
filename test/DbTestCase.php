@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace DevTheorem\PeachySQL\Test;
 
 use DevTheorem\PeachySQL\QueryBuilder\SqlParams;

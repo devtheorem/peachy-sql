@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace DevTheorem\PeachySQL;
 
 use DevTheorem\PeachySQL\QueryBuilder\{Delete, Insert, SqlParams, Update};
