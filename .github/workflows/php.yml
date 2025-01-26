@@ -7,7 +7,7 @@ jobs:
 
     strategy:
       matrix:
-        php: [ '8.1', '8.2', '8.3' ]
+        php: [ '8.1', '8.2', '8.3', '8.4' ]
 
     services:
       mysql:
@@ -48,9 +48,9 @@ jobs:
       - name: Install Composer dependencies
         run: composer install --no-progress
 
-      - name: Run Psalm
-        run: composer analyze -- --output-format=github
-        if: ${{ matrix.php == '8.3' }}
+      - name: Perform static analysis
+        run: composer analyze -- --error-format=github
+        if: ${{ matrix.php == '8.4' }}
 
       - name: Run PHPUnit
         run: composer test-without-mssql

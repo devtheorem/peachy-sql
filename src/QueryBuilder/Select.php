@@ -8,6 +8,7 @@ namespace DevTheorem\PeachySQL\QueryBuilder;
 class Select extends Query
 {
     /**
+     * @param string[] $orderBy
      * @throws \Exception if there is an invalid sort direction
      */
     public function buildOrderByClause(array $orderBy): string
@@ -19,12 +20,10 @@ class Select extends Query
         $sql = ' ORDER BY ';
 
         // [column1, column2, ...]
-        if (isset($orderBy[0])) {
-            /** @var array<int, string> $orderBy */
+        if (array_is_list($orderBy)) {
             return $sql . implode(', ', $this->escapeColumns($orderBy));
         }
 
-        /** @var array<string, string> $orderBy */
         // [column1 => direction, column2 => direction, ...]
         foreach ($orderBy as $column => $direction) {
             $column = $this->escapeIdentifier($column);

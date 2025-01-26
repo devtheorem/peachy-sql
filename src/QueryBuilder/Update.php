@@ -24,7 +24,6 @@ class Update extends Query
         $params = [];
         $sql = "UPDATE {$table} SET ";
 
-        /** @psalm-suppress MixedAssignment */
         foreach ($set as $column => $value) {
             $sql .= $this->escapeIdentifier($column) . ' = ?, ';
             $params[] = $value;

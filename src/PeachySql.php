@@ -36,6 +36,7 @@ class PeachySql
     public function begin(): void
     {
         if (!$this->conn->beginTransaction()) {
+            /** @phpstan-ignore argument.type */
             throw $this->getError('Failed to begin transaction', $this->conn->errorInfo());
         }
     }
@@ -47,6 +48,7 @@ class PeachySql
     public function commit(): void
     {
         if (!$this->conn->commit()) {
+            /** @phpstan-ignore argument.type */
             throw $this->getError('Failed to commit transaction', $this->conn->errorInfo());
         }
     }
@@ -58,6 +60,7 @@ class PeachySql
     public function rollback(): void
     {
         if (!$this->conn->rollback()) {
+            /** @phpstan-ignore argument.type */
             throw $this->getError('Failed to roll back transaction', $this->conn->errorInfo());
         }
     }
@@ -72,10 +75,12 @@ class PeachySql
         return [$binaryStr, PDO::PARAM_LOB, 0, $driverOptions];
     }
 
-    /** @internal */
+    /**
+     * @param array{0: string, 1: int|null, 2: string|null} $error
+     * @internal
+     */
     public static function getError(string $message, array $error): SqlException
     {
-        /** @var array{0: string, 1: int|null, 2: string|null} $error */
         $code = $error[1] ?? 0;
         $details = $error[2] ?? '';
         $sqlState = $error[0];
@@ -84,18 +89,19 @@ class PeachySql
     }
 
     /**
-     * Returns a prepared statement which can be executed multiple times
+     * Returns a prepared statement which can be executed multiple times.
+     * @param list<mixed> $params
      * @throws SqlException if an error occurs
      */
     public function prepare(string $sql, array $params = []): Statement
     {
         try {
             if (!$stmt = $this->conn->prepare($sql)) {
+                /** @phpstan-ignore argument.type */
                 throw $this->getError('Failed to prepare statement', $this->conn->errorInfo());
             }
 
             $i = 0;
-            /** @psalm-suppress MixedAssignment */
             foreach ($params as &$param) {
                 $i++;
 
@@ -111,6 +117,7 @@ class PeachySql
                 }
             }
         } catch (\PDOException $e) {
+            /** @phpstan-ignore argument.type */
             throw $this->getError('Failed to prepare statement', $this->conn->errorInfo());
         }
 
@@ -118,7 +125,8 @@ class PeachySql
     }
 
     /**
-     * Prepares and executes a single query with bound parameters
+     * Prepares and executes a single query with bound parameters.
+     * @param list<mixed> $params
      */
     public function query(string $sql, array $params = []): Statement
     {

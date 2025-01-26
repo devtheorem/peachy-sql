@@ -109,6 +109,10 @@ abstract class DbTestCase extends TestCase
         $db = static::dbProvider();
         $img = file_get_contents('test/DevTheorem.png');
 
+        if ($img === false) {
+            throw new \Exception('Failed to read image');
+        }
+
         $id = $db->insertRow($this->table, [
             'name' => 'DevTheorem',
             'dob' => '2024-10-24',
@@ -122,7 +126,7 @@ abstract class DbTestCase extends TestCase
             ->where(['user_id' => $id])->query()->getFirst();
 
         if ($db->options->binarySelectedAsStream) {
-            /** @psalm-suppress PossiblyInvalidArgument */
+            /** @phpstan-ignore argument.type */
             $row['photo'] = stream_get_contents($row['photo']);
         }
 
@@ -153,6 +157,11 @@ abstract class DbTestCase extends TestCase
         $this->assertInstanceOf(\Generator::class, $iterator);
         $colValsCompare = [];
 
+        /** @var array{
+         *     user_id: int, name: string, dob: string, weight: string|float,
+         *     is_disabled: int|bool, uuid: string|null|resource
+         * } $row
+         */
         foreach ($iterator as $row) {
             unset($row['user_id']);
 
@@ -163,7 +172,7 @@ abstract class DbTestCase extends TestCase
                 $row['is_disabled'] = (bool) $row['is_disabled'];
             }
             if ($options->binarySelectedAsStream && $row['uuid'] !== null) {
-                /** @psalm-suppress MixedArgument */
+                /** @phpstan-ignore argument.type */
                 $row['uuid'] = stream_get_contents($row['uuid']);
             }
 
@@ -186,7 +195,6 @@ abstract class DbTestCase extends TestCase
         foreach ($realNames as $_row) {
             $_id = $_row['user_id'];
             $_name = $_row['name'];
-            /** @psalm-suppress MixedArrayAssignment */
             $_uuid[0] = $_row['uuid'];
             $stmt->execute();
         }
@@ -250,14 +258,14 @@ abstract class DbTestCase extends TestCase
         if ($options->binarySelectedAsStream || $options->nativeBoolColumns || $options->floatSelectedAsString) {
             /** @var array{weight: float|string, is_disabled: int|bool, uuid: string|resource} $row */
             foreach ($rows as &$row) {
-                if (!is_float($row['weight'])) {
+                if ($options->floatSelectedAsString) {
                     $row['weight'] = (float) $row['weight'];
                 }
-                if (!is_int($row['is_disabled'])) {
+                if ($options->nativeBoolColumns) {
                     $row['is_disabled'] = (int) $row['is_disabled'];
                 }
-                if (!is_string($row['uuid'])) {
-                    /** @psalm-suppress InvalidArgument */
+                if ($options->binarySelectedAsStream) {
+                    /** @phpstan-ignore argument.type */
                     $row['uuid'] = stream_get_contents($row['uuid']);
                 }
             }
@@ -274,12 +282,13 @@ abstract class DbTestCase extends TestCase
         $userId = $ids[0];
         $set = ['uuid' => $peachySql->makeBinaryParam($newUuid)];
         $peachySql->updateRows($this->table, $set, ['user_id' => $userId]);
-        /** @var array{uuid: string|resource} $updatedRow */
         $updatedRow = $peachySql->selectFrom("SELECT uuid FROM {$this->table}")
             ->where(['user_id' => $userId])->query()->getFirst();
 
-        if (!is_string($updatedRow['uuid'])) {
-            $updatedRow['uuid'] = stream_get_contents($updatedRow['uuid']); // needed for PostgreSQL
+        if ($updatedRow === null) {
+            throw new \Exception('Failed to select updated UUID');
+        } elseif ($options->binarySelectedAsStream && is_resource($updatedRow['uuid'])) {
+            $updatedRow['uuid'] = stream_get_contents($updatedRow['uuid']);
         }
 
         $this->assertSame($newUuid, $updatedRow['uuid']);

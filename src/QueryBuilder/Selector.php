@@ -11,6 +11,9 @@ class Selector
 {
     /** @var WhereClause */
     private array $where = [];
+    /**
+     * @var string[]
+     */
     private array $orderBy = [];
     private ?int $limit = null;
     private ?int $offset = null;
@@ -35,6 +38,7 @@ class Selector
     }
 
     /**
+     * @param mixed[] $sort
      * @throws \Exception if called more than once
      */
     public function orderBy(array $sort): static
@@ -43,6 +47,13 @@ class Selector
             throw new \Exception('orderBy method can only be called once');
         }
 
+        foreach ($sort as $val) {
+            if (!is_string($val)) {
+                throw new \Exception('Invalid type for sort value: ' . get_debug_type($val));
+            }
+        }
+
+        /** @var string[] $sort */
         $this->orderBy = $sort;
         return $this;
     }

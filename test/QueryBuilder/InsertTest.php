@@ -55,6 +55,7 @@ class InsertTest extends TestCase
     /**
      * @dataProvider batchRowsTestCases
      * @param list<array<string, string>> $colVals
+     * @param list<list<array<string, string>>> $expected
      */
     public function testBatchRows(array $colVals, int $maxParams, int $maxRows, array $expected): void
     {

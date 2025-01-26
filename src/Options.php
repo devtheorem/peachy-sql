@@ -50,7 +50,10 @@ class Options
         } elseif ($this->driver === 'pgsql') {
             $this->binarySelectedAsStream = true;
             $this->nativeBoolColumns = true;
-            $this->floatSelectedAsString = true;
+
+            if (PHP_VERSION_ID < 80_400) {
+                $this->floatSelectedAsString = true;
+            }
         }
     }
 }

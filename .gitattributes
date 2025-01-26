@@ -1,4 +1,4 @@
 /.github/     export-ignore
 /test/        export-ignore
 /phpunit.xml  export-ignore
-/psalm.xml    export-ignore
+/phpstan.neon export-ignore

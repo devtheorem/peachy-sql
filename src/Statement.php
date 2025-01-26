@@ -36,9 +36,11 @@ class Statement
 
         try {
             if (!$this->stmt->execute()) {
+                /** @phpstan-ignore argument.type */
                 throw PeachySql::getError('Failed to execute prepared statement', $this->stmt->errorInfo());
             }
         } catch (PDOException $e) {
+            /** @phpstan-ignore argument.type */
             throw PeachySql::getError('Failed to execute prepared statement', $this->stmt->errorInfo());
         }
 
@@ -61,15 +63,13 @@ class Statement
 
     /**
      * Returns an iterator which can be used to loop through each row in the result
-     * @return \Generator<int, array>
+     * @return \Generator<int, mixed[]>
      */
     public function getIterator(): \Generator
     {
         if ($this->stmt !== null) {
-            while (
-                /** @var array|false $row */
-                $row = $this->stmt->fetch(PDO::FETCH_ASSOC)
-            ) {
+            while ($row = $this->stmt->fetch(PDO::FETCH_ASSOC)) {
+                /** @phpstan-ignore generator.valueType */
                 yield $row;
             }
 
@@ -94,7 +94,8 @@ class Statement
     }
 
     /**
-     * Returns all rows selected by the query
+     * Returns all rows selected by the query.
+     * @return mixed[]
      */
     public function getAll(): array
     {
@@ -102,12 +103,14 @@ class Statement
     }
 
     /**
-     * Returns the first selected row, or null if zero rows were returned
+     * Returns the first selected row, or null if zero rows were returned.
+     * @return mixed[]|null
      */
     public function getFirst(): ?array
     {
         $row = $this->getIterator()->current();
 
+        /** @phpstan-ignore notIdentical.alwaysTrue */
         if ($row !== null) {
             $this->close(); // don't leave the SQL statement open
         }

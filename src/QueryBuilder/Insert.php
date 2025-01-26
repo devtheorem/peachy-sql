@@ -29,6 +29,7 @@ class Insert extends Query
             $maxRowsPerQuery = $maxRows;
         }
 
+        /** @phpstan-ignore argument.type */
         return array_chunk($colVals, $maxRowsPerQuery);
     }
 
@@ -38,25 +39,18 @@ class Insert extends Query
      */
     public function buildQuery(string $table, array $colVals): SqlParams
     {
-        self::validateColValsStructure($colVals);
+        if (!$colVals || empty($colVals[0])) {
+            throw new \Exception('A valid array of columns/values to insert must be specified');
+        }
 
         $columns = $this->escapeColumns(array_keys($colVals[0]));
         $insert = "INSERT INTO {$table} (" . implode(', ', $columns) . ')';
 
         $valSetStr = ' (' . str_repeat('?,', count($columns) - 1) . '?),';
         $valStr = ' VALUES' . substr_replace(str_repeat($valSetStr, count($colVals)), '', -1); // remove trailing comma
-        $params = array_merge(...array_map('array_values', $colVals));
+        /** @phpstan-ignore argument.type */
+        $params = array_merge(...array_map(array_values(...), $colVals));
 
         return new SqlParams($insert . $valStr, $params);
-    }
-
-    /**
-     * @throws \Exception if the column/values array does not have a valid structure
-     */
-    private static function validateColValsStructure(array $colVals): void
-    {
-        if (empty($colVals[0]) || !is_array($colVals[0])) {
-            throw new \Exception('A valid array of columns/values to insert must be specified');
-        }
     }
 }
