@@ -27,10 +27,10 @@ class MssqlDbTest extends DbTestCase
     {
         if (!self::$db) {
             $c = App::$config;
-            $server = $c->getMssqlServer();
+            $server = $c->mssqlServer;
             $connStr = getenv('MSSQL_CONNECTION_STRING');
-            $username = $c->getMssqlUsername();
-            $password = $c->getMssqlPassword();
+            $username = $c->mssqlUsername;
+            $password = $c->mssqlPassword;
 
             if ($connStr !== false) {
                 // running tests with GitHub Actions

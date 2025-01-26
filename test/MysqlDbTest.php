@@ -28,7 +28,7 @@ class MysqlDbTest extends DbTestCase
         if (!self::$db) {
             $c = App::$config;
 
-            $pdo = new PDO($c->getMysqlDsn(), $c->getMysqlUser(), $c->getMysqlPassword(), [
+            $pdo = new PDO($c->mysqlDsn, $c->mysqlUser, $c->mysqlPassword, [
                 PDO::ATTR_EMULATE_PREPARES => false,
             ]);
 

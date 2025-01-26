@@ -1,13 +1,19 @@
 <?php
 
-use DevTheorem\PeachySQL\Test\src\{App, Config, LocalConfig};
+use DevTheorem\PeachySQL\Test\src\{App, Config};
 
 require 'vendor/autoload.php';
 
-if (class_exists(LocalConfig::class)) {
-    // suppress error when LocalConfig doesn't exist
-    /** @psalm-suppress MixedAssignment */
-    App::$config = new LocalConfig();
+$configFile = __DIR__ . '/config.php';
+
+if (file_exists($configFile)) {
+    $config = require $configFile;
+
+    if (!$config instanceof Config) {
+        throw new Exception('Expected config file to return Config instance');
+    }
+
+    App::$config = $config;
 } else {
     App::$config = new Config();
 }

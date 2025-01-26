@@ -38,17 +38,18 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          tools: psalm
-          extensions: sqlsrv-5.10.1
 
       - name: Setup problem matchers for PHPUnit
         run: echo "::add-matcher::${{ runner.tool_cache }}/phpunit.json"
+
+      - name: Validate composer.json and composer.lock
+        run: composer validate --strict
 
       - name: Install Composer dependencies
         run: composer install --no-progress
 
       - name: Run Psalm
-        run: psalm --output-format=github
+        run: composer analyze -- --output-format=github
         if: ${{ matrix.php == '8.3' }}
 
       - name: Run PHPUnit

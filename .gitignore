@@ -4,4 +4,4 @@
 
 /vendor/
 /composer.lock
-/test/src/LocalConfig.php
+/test/config.php
