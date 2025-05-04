@@ -16,10 +16,10 @@ which should be an existing [PDO object](https://www.php.net/manual/en/class.pdo
 ```php
 use DevTheorem\PeachySQL\PeachySql;
 
-$connection = new PDO('sqlsrv:server=(local)', $username, $password, [
+$server = '(local)\SQLEXPRESS';
+$connection = new PDO("sqlsrv:Server={$server};Database=someDbName", $username, $password, [
     PDO::ATTR_EMULATE_PREPARES => false,
     PDO::SQLSRV_ATTR_FETCHES_NUMERIC_TYPE => true,
-    'Database' => 'someDbName',
 ]);
 
 $db = new PeachySql($connection);
