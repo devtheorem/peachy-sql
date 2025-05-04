@@ -38,14 +38,13 @@ class PgsqlDbTest extends DbTestCase
                 PDO::ATTR_EMULATE_PREPARES => false,
             ]);
 
-            self::$db = new PeachySql($pdo);
-            self::createTestTable(self::$db);
+            self::$db = self::createTestTable(new PeachySql($pdo));
         }
 
         return self::$db;
     }
 
-    private static function createTestTable(PeachySql $db): void
+    private static function createTestTable(PeachySql $db): PeachySql
     {
         $sql = "
             CREATE TABLE Users (
@@ -60,5 +59,6 @@ class PgsqlDbTest extends DbTestCase
 
         $db->query("DROP TABLE IF EXISTS Users");
         $db->query($sql);
+        return $db;
     }
 }

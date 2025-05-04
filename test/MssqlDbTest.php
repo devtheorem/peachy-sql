@@ -52,14 +52,13 @@ class MssqlDbTest extends DbTestCase
                 PDO::SQLSRV_ATTR_FETCHES_NUMERIC_TYPE => true,
             ]);
 
-            self::$db = new PeachySql($pdo);
-            self::createTestTable(self::$db);
+            self::$db = self::createTestTable(new PeachySql($pdo));
         }
 
         return self::$db;
     }
 
-    private static function createTestTable(PeachySql $db): void
+    private static function createTestTable(PeachySql $db): PeachySql
     {
         $sql = "
             DROP TABLE IF EXISTS Users;
@@ -74,5 +73,6 @@ class MssqlDbTest extends DbTestCase
             )";
 
         $db->query($sql);
+        return $db;
     }
 }

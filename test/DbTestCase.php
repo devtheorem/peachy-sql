@@ -2,8 +2,8 @@
 
 namespace DevTheorem\PeachySQL\Test;
 
-use DevTheorem\PeachySQL\QueryBuilder\SqlParams;
 use DevTheorem\PeachySQL\{PeachySql, SqlException};
+use DevTheorem\PeachySQL\QueryBuilder\SqlParams;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 

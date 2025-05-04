@@ -48,7 +48,6 @@ class Insert extends Query
 
         $valSetStr = ' (' . str_repeat('?,', count($columns) - 1) . '?),';
         $valStr = ' VALUES' . substr_replace(str_repeat($valSetStr, count($colVals)), '', -1); // remove trailing comma
-        /** @phpstan-ignore argument.type */
         $params = array_merge(...array_map(array_values(...), $colVals));
 
         return new SqlParams($insert . $valStr, $params);
