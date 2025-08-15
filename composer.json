@@ -20,10 +20,10 @@
         "ext-pdo": "*"
     },
     "require-dev": {
-        "friendsofphp/php-cs-fixer": "^3.75",
-        "phpstan/phpstan": "^2.1.14",
+        "friendsofphp/php-cs-fixer": "^3.86",
+        "phpstan/phpstan": "^2.1.22",
         "phpunit/phpunit": "^10.5",
-        "ramsey/uuid": "^4.2.3"
+        "ramsey/uuid": "^4.9"
     },
     "autoload": {
         "psr-4": {

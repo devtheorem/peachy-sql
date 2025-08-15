@@ -12,8 +12,6 @@ use DevTheorem\PeachySQL\Options;
  */
 class Query
 {
-    protected Options $options;
-
     private const OPERATOR_MAP = [
         'eq' => '=',
         'ne' => '<>',
@@ -26,6 +24,8 @@ class Query
         'nu' => 'IS NULL',
         'nn' => 'IS NOT NULL',
     ];
+
+    protected Options $options;
 
     public function __construct(Options $options)
     {
@@ -60,8 +60,8 @@ class Query
     }
 
     /**
-     * @throws \Exception if a column filter is empty
      * @param WhereClause $columnVals
+     * @throws \Exception if a column filter is empty
      */
     public function buildWhereClause(array $columnVals): SqlParams
     {
