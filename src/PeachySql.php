@@ -30,6 +30,22 @@ class PeachySql
     }
 
     /**
+     * Automatically begins a transaction, runs the callback function, and commits
+     * the transaction on success, or rolls it back if an error occurs.
+     */
+    public function transaction(\Closure $callback): void
+    {
+        $this->begin();
+        try {
+            $callback();
+            $this->commit();
+        } catch (\Throwable $e) {
+            $this->rollback();
+            throw $e;
+        }
+    }
+
+    /**
      * Begins a transaction
      * @throws SqlException if an error occurs
      */
