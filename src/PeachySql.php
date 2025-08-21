@@ -30,6 +30,30 @@ class PeachySql
     }
 
     /**
+     * Automatically begins a transaction, runs the callback function, and commits
+     * the transaction on success, or rolls it back if an error occurs.
+     *
+     * @template T
+     * @param (\Closure(static): T) $callback
+     * @return T
+     */
+    public function transaction(\Closure $callback): mixed
+    {
+        // For reference, how similar functionality is implemented in Doctrine and Laravel:
+        // https://github.com/doctrine/dbal/blob/5.0.x/src/Connection.php#L909
+        // https://github.com/laravel/framework/blob/12.x/src/Illuminate/Database/Concerns/ManagesTransactions.php#L16
+        $this->begin();
+        try {
+            $result = $callback($this);
+            $this->commit();
+            return $result;
+        } catch (\Throwable $e) {
+            $this->rollback();
+            throw $e;
+        }
+    }
+
+    /**
      * Begins a transaction
      * @throws SqlException if an error occurs
      */
