@@ -7,7 +7,7 @@ jobs:
 
     strategy:
       matrix:
-        php: [ '8.1', '8.2', '8.3', '8.4' ]
+        php: [ '8.1', '8.2', '8.3', '8.4', '8.5' ]
 
     services:
       mysql:
@@ -31,7 +31,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Docs: https://github.com/shivammathur/setup-php
       - name: Setup PHP
@@ -50,7 +50,7 @@ jobs:
 
       - name: Perform static analysis
         run: composer analyze -- --error-format=github
-        if: ${{ matrix.php == '8.4' }}
+        if: ${{ matrix.php == '8.5' }}
 
       - name: Run PHPUnit
         run: composer test-without-mssql
@@ -59,4 +59,4 @@ jobs:
 
       - name: Check Formatting
         run: vendor/bin/php-cs-fixer fix -v --dry-run --stop-on-violation --using-cache=no
-        if: ${{ matrix.php == '8.4' }}
+        if: ${{ matrix.php == '8.5' }}
