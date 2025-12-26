@@ -16,13 +16,13 @@
         }
     ],
     "require": {
-        "php": ">=8.1",
+        "php": ">=8.2",
         "ext-pdo": "*"
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.91",
         "phpstan/phpstan": "^2.1.32",
-        "phpunit/phpunit": "^10.5",
+        "phpunit/phpunit": "^11.5",
         "ramsey/uuid": "^4.9"
     },
     "autoload": {
@@ -42,9 +42,9 @@
         "analyze": "phpstan analyze",
         "cs-fix": "php-cs-fixer fix -v",
         "test": "phpunit test --bootstrap test/bootstrap.php",
-        "test-mssql": "@test --exclude-group mysql,pgsql",
-        "test-mysql": "@test --exclude-group mssql,pgsql",
-        "test-pgsql": "@test --exclude-group mssql,mysql",
+        "test-mssql": "@test --exclude-group mysql --exclude-group pgsql",
+        "test-mysql": "@test --exclude-group mssql --exclude-group pgsql",
+        "test-pgsql": "@test --exclude-group mssql --exclude-group mysql",
         "test-without-mssql": "@test --exclude-group mssql"
     }
 }

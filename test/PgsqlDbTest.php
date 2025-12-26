@@ -5,10 +5,9 @@ namespace DevTheorem\PeachySQL\Test;
 use DevTheorem\PeachySQL\PeachySql;
 use DevTheorem\PeachySQL\Test\src\App;
 use PDO;
+use PHPUnit\Framework\Attributes\Group;
 
-/**
- * @group pgsql
- */
+#[Group('pgsql')]
 class PgsqlDbTest extends DbTestCase
 {
     private static ?PeachySql $db = null;

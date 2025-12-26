@@ -4,6 +4,7 @@ namespace DevTheorem\PeachySQL\Test\QueryBuilder;
 
 use DevTheorem\PeachySQL\Options;
 use DevTheorem\PeachySQL\QueryBuilder\Insert;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -53,10 +54,10 @@ class InsertTest extends TestCase
     }
 
     /**
-     * @dataProvider batchRowsTestCases
      * @param list<array<string, string>> $colVals
      * @param list<list<array<string, string>>> $expected
      */
+    #[DataProvider('batchRowsTestCases')]
     public function testBatchRows(array $colVals, int $maxParams, int $maxRows, array $expected): void
     {
         $result = Insert::batchRows($colVals, $maxParams, $maxRows);
