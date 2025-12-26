@@ -2,4 +2,4 @@ parameters:
 	level: 10
 	paths:
 		- src
-		- test
+		- tests

@@ -11,7 +11,7 @@ From a console in the working directory, execute `composer test` to run all unit
 
 > [!NOTE]
 > By default, database tests will attempt to run on a database named `PeachySQL`.
-> To override connection settings, create a `test/config.php` file which returns
+> To override connection settings, create a `tests/config.php` file which returns
 > an instance of `Config` with the desired property values.
 
 ## Formatting and static analysis

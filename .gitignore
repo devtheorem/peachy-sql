@@ -1,7 +1,7 @@
-.idea
+.idea/
 .phpunit.result.cache
 .php-cs-fixer.cache
 
 /vendor/
 /composer.lock
-/test/config.php
+/tests/config.php

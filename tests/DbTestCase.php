@@ -107,7 +107,7 @@ abstract class DbTestCase extends TestCase
     public function testBlob(): void
     {
         $db = static::dbProvider();
-        $img = file_get_contents('test/DevTheorem.png');
+        $img = file_get_contents(__DIR__ . '/DevTheorem.png');
 
         if ($img === false) {
             throw new \Exception('Failed to read image');

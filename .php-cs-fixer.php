@@ -3,7 +3,7 @@
 $finder = PhpCsFixer\Finder::create()
     ->path([
         'src/',
-        'test/',
+        'tests/',
     ])
     ->ignoreVCSIgnored(true)
     ->append([__FILE__])
