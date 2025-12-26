@@ -46,7 +46,7 @@ jobs:
         run: composer validate --strict
 
       - name: Install Composer dependencies
-        run: composer install --no-progress
+        uses: "ramsey/composer-install@v3"
 
       - name: Perform static analysis
         run: composer analyze -- --error-format=github
@@ -58,5 +58,5 @@ jobs:
           POSTGRES_HOST: localhost
 
       - name: Check Formatting
-        run: vendor/bin/php-cs-fixer fix -v --dry-run --stop-on-violation --using-cache=no
+        run: vendor/bin/php-cs-fixer check -v --show-progress=dots --stop-on-violation --using-cache=no
         if: ${{ matrix.php == '8.5' }}

@@ -41,10 +41,10 @@
     "scripts": {
         "analyze": "phpstan analyze",
         "cs-fix": "php-cs-fixer fix -v",
-        "test": "phpunit",
-        "test-mssql": "phpunit --exclude-group mysql,pgsql",
-        "test-mysql": "phpunit --exclude-group mssql,pgsql",
-        "test-pgsql": "phpunit --exclude-group mssql,mysql",
-        "test-without-mssql": "phpunit --exclude-group mssql"
+        "test": "phpunit test --bootstrap test/bootstrap.php",
+        "test-mssql": "@test --exclude-group mysql,pgsql",
+        "test-mysql": "@test --exclude-group mssql,pgsql",
+        "test-pgsql": "@test --exclude-group mssql,mysql",
+        "test-without-mssql": "@test --exclude-group mssql"
     }
 }
