@@ -69,7 +69,6 @@ class Statement
     {
         if ($this->stmt !== null) {
             while ($row = $this->stmt->fetch(PDO::FETCH_ASSOC)) {
-                /** @phpstan-ignore generator.valueType */
                 yield $row;
             }
 
