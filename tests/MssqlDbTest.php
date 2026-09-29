@@ -22,36 +22,33 @@ class MssqlDbTest extends DbTestCase
         return 'Incorrect syntax';
     }
 
+    public static function createConnection(): PDO
+    {
+        // set when running tests with GitHub Actions
+        $server = getenv('SQLCMDSERVER');
+        $username = getenv('SQLCMDUSER');
+        $password = getenv('SQLCMDPASSWORD');
+
+        if ($server === false || $username === false || $password === false) {
+            $c = App::$config;
+            $server = $c->mssqlServer;
+            $username = $c->mssqlUsername;
+            $password = $c->mssqlPassword;
+        }
+
+        // ODBC Driver 18 encrypts connections by default, and test servers generally use a self-signed certificate
+        $dsn = "sqlsrv:Server=$server;Database=PeachySQL;TrustServerCertificate=1";
+
+        return new PDO($dsn, $username, $password, [
+            PDO::ATTR_EMULATE_PREPARES => false,
+            PDO::SQLSRV_ATTR_FETCHES_NUMERIC_TYPE => true,
+        ]);
+    }
+
     public static function dbProvider(): PeachySql
     {
         if (!self::$db) {
-            $c = App::$config;
-            $server = $c->mssqlServer;
-            $connStr = getenv('MSSQL_CONNECTION_STRING');
-            $username = $c->mssqlUsername;
-            $password = $c->mssqlPassword;
-
-            if ($connStr !== false) {
-                // running tests with GitHub Actions
-                $server = getenv('SQLCMDSERVER');
-                if ($server === false) {
-                    throw new \Exception('SQLCMDSERVER not set');
-                }
-                $envUsername = getenv('SQLCMDUSER');
-                $envPassword = getenv('SQLCMDPASSWORD');
-
-                if (is_string($envUsername) && is_string($envPassword)) {
-                    $username = $envUsername;
-                    $password = $envPassword;
-                }
-            }
-
-            $pdo = new PDO("sqlsrv:Server=$server;Database=PeachySQL", $username, $password, [
-                PDO::ATTR_EMULATE_PREPARES => false,
-                PDO::SQLSRV_ATTR_FETCHES_NUMERIC_TYPE => true,
-            ]);
-
-            self::$db = self::createTestTable(new PeachySql($pdo));
+            self::$db = self::createTestTable(new PeachySql(self::createConnection()));
         }
 
         return self::$db;

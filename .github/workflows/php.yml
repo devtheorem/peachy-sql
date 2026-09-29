@@ -34,11 +34,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      # Required by install-sql-server-action (a no-op on Linux besides exporting a module path)
+      - name: Setup WSL
+        uses: Particular/setup-wsl-action@v1.2.0
+
+      # Starts SQL Server in a container, creates the database, and sets the SQLCMD* environment
+      # variables used by the tests. Docs: https://github.com/Particular/install-sql-server-action
+      - name: Install SQL Server
+        uses: Particular/install-sql-server-action@v3.0.0
+        with:
+          connection-string-env-var: MSSQL_CONNECTION_STRING
+          catalog: PeachySQL
+          collation: SQL_Latin1_General_CP1_CI_AS
+
+      # The runner image includes Microsoft's package repository, but not the ODBC driver
+      - name: Install Microsoft ODBC Driver for SQL Server
+        run: |
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18
+
       # Docs: https://github.com/shivammathur/setup-php
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
+          extensions: pdo_sqlsrv
 
       - name: Setup problem matchers for PHPUnit
         run: echo "::add-matcher::${{ runner.tool_cache }}/phpunit.json"
@@ -50,7 +70,7 @@ jobs:
         uses: "ramsey/composer-install@v4"
 
       - name: Run PHPUnit
-        run: composer test-without-mssql
+        run: composer test
         env:
           POSTGRES_HOST: localhost
 
