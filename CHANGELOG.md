@@ -13,6 +13,9 @@
   rather than `@@IDENTITY` (like before v7.0).
 - With SQL Server, the affected count from `insertRow()` and `insertRows()` no longer includes
   rows inserted by triggers.
+- An error while fetching a row (e.g. a conversion error in a SQL Server result that's sent as it's
+  computed) threw a `PDOException` rather than a `SqlException`. Without the exception error mode,
+  the error was ignored and the results ended early.
 
 ### Changed
 - With SQL Server, `insertRow()` and `insertRows()` no longer return IDs for tables and views with an

@@ -67,9 +67,26 @@ class Statement
      */
     public function getIterator(): \Generator
     {
-        if ($this->stmt !== null) {
-            while ($row = $this->stmt->fetch(PDO::FETCH_ASSOC)) {
-                yield $row;
+        $stmt = $this->stmt;
+
+        if ($stmt !== null) {
+            // rows may be streamed as they're computed, so an error can occur while fetching them
+            try {
+                while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                    yield $row;
+                }
+            } catch (PDOException $e) {
+                /** @phpstan-ignore argument.type */
+                throw PeachySql::getError('Failed to fetch row', $stmt->errorInfo());
+            }
+
+            // Without the exception error mode, fetch() returns false on error just like when there are no more rows.
+            // SQLSTATE classes 00, 01, and 02 indicate success, a warning, and no data, respectively.
+            $sqlState = (string) $stmt->errorCode();
+
+            if (!in_array(substr($sqlState, 0, 2), ['', '00', '01', '02'], true)) {
+                /** @phpstan-ignore argument.type */
+                throw PeachySql::getError('Failed to fetch row', $stmt->errorInfo());
             }
 
             if (!$this->usedPrepare) {

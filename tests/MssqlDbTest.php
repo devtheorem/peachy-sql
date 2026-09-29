@@ -2,7 +2,7 @@
 
 namespace DevTheorem\PeachySQL\Test;
 
-use DevTheorem\PeachySQL\PeachySql;
+use DevTheorem\PeachySQL\{PeachySql, SqlException};
 use DevTheorem\PeachySQL\Test\src\App;
 use PDO;
 use PHPUnit\Framework\Attributes\Group;
@@ -96,6 +96,29 @@ class MssqlDbTest extends DbTestCase
             $this->assertSame(1001, $db->insertRow('ExplicitIdentity', ['id' => 1001, 'name' => 'row1001'])->id);
         } finally {
             self::$conn->exec('SET IDENTITY_INSERT ExplicitIdentity OFF');
+        }
+    }
+
+    public function testFetchErrorThrowsSqlException(): void
+    {
+        // without ORDER BY, rows are sent as they're computed, so the error on the last row occurs while fetching
+        $sql = "SELECT CAST(CASE WHEN n = 20000 THEN 'x' ELSE CAST(n AS varchar(10)) END AS int) AS n
+            FROM (SELECT TOP (20000) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n
+                FROM sys.all_objects a CROSS JOIN sys.all_objects b) t";
+
+        $stmt = static::dbProvider()->query($sql);
+        $fetched = 0;
+
+        try {
+            foreach ($stmt->getIterator() as $row) {
+                $fetched++;
+            }
+
+            $this->fail('Failed to throw exception for fetch error');
+        } catch (SqlException $e) {
+            $this->assertGreaterThan(0, $fetched); // the error wasn't from executing the query
+            $this->assertSame(245, $e->getCode());
+            $this->assertStringContainsString('Conversion failed', $e->getMessage());
         }
     }
 
