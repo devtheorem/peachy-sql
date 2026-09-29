@@ -2,7 +2,8 @@
 
 namespace DevTheorem\PeachySQL;
 
-use DevTheorem\PeachySQL\QueryBuilder\{Delete, Insert, SqlParams, Update};
+use Closure;
+use DevTheorem\PeachySQL\QueryBuilder\{Delete, Insert, Query, SqlParams, Update};
 use PDO;
 
 /**
@@ -241,16 +242,21 @@ class PeachySql
     {
         // check whether the query needs to be split into multiple batches
         $batches = Insert::batchRows($colVals, $this->options->maxBoundParams, $this->options->maxInsertRows);
-        $ids = [];
-        $affected = 0;
 
-        foreach ($batches as $batch) {
-            $result = $this->insertBatch($table, $batch, $identityIncrement, $idColumn);
-            $ids = array_merge($ids, $result->ids);
-            $affected += $result->affected;
-        }
+        $insertBatches = function () use ($table, $batches, $identityIncrement, $idColumn): BulkInsertResult {
+            $ids = [];
+            $affected = 0;
 
-        return new BulkInsertResult($ids, $affected, count($batches));
+            foreach ($batches as $batch) {
+                $result = $this->insertBatch($table, $batch, $identityIncrement, $idColumn);
+                $ids = array_merge($ids, $result->ids);
+                $affected += $result->affected;
+            }
+
+            return new BulkInsertResult($ids, $affected, count($batches));
+        };
+
+        return count($batches) > 1 ? $this->runInTransaction($insertBatches) : $insertBatches();
     }
 
     /**
@@ -262,8 +268,11 @@ class PeachySql
     public function updateRows(string $table, array $set, array $where): int
     {
         $update = new Update($this->options);
-        $sqlParams = $update->buildQuery($table, $set, $where);
-        return $this->query($sqlParams->sql, $sqlParams->params)->getAffected();
+
+        // A column being set to a non-null value can't be split, since the rows updated by one batch could then match
+        // a later batch. Null is safe, since it can't match a list of values (an IN condition is never true for null).
+        $excludedColumns = array_keys(array_filter($set, fn($value) => $value !== null));
+        return $this->runInBatches($where, fn(array $where) => $update->buildQuery($table, $set, $where), $excludedColumns);
     }
 
     /**
@@ -274,7 +283,63 @@ class PeachySql
     public function deleteFrom(string $table, array $where): int
     {
         $delete = new Delete($this->options);
-        $sqlParams = $delete->buildQuery($table, $where);
-        return $this->query($sqlParams->sql, $sqlParams->params)->getAffected();
+        return $this->runInBatches($where, fn(array $where) => $delete->buildQuery($table, $where));
+    }
+
+    /**
+     * Runs the query built for the where clause, and returns the number of affected rows. If the query has
+     * more bound parameters than allowed, it's split into multiple queries which are run in a transaction
+     * (unless a transaction has already been started).
+     * @param WhereClause $where
+     * @param Closure(WhereClause): SqlParams $buildQuery
+     * @param string[] $excludedColumns Columns which can't be used to split the query
+     */
+    private function runInBatches(array $where, Closure $buildQuery, array $excludedColumns = []): int
+    {
+        $sqlParams = $buildQuery($where);
+        $paramCount = count($sqlParams->params);
+        $maxParams = $this->options->maxBoundParams;
+
+        if ($maxParams <= 0 || $paramCount <= $maxParams) {
+            return $this->query($sqlParams->sql, $sqlParams->params)->getAffected();
+        }
+
+        $batches = Query::batchWhere($where, $paramCount, $maxParams, $excludedColumns);
+
+        return $this->runInTransaction(function () use ($batches, $buildQuery): int {
+            $affected = 0;
+
+            foreach ($batches as $batchWhere) {
+                $batchParams = $buildQuery($batchWhere);
+                $affected += $this->query($batchParams->sql, $batchParams->params)->getAffected();
+            }
+
+            return $affected;
+        });
+    }
+
+    /**
+     * Runs the function in a transaction (unless one has already been started), so that if it runs multiple
+     * queries, a failure doesn't leave the changes from some of them committed.
+     * @template T
+     * @param Closure(): T $fn
+     * @return T
+     */
+    private function runInTransaction(Closure $fn): mixed
+    {
+        if ($this->conn->inTransaction()) {
+            return $fn();
+        }
+
+        $this->begin();
+
+        try {
+            $result = $fn();
+            $this->commit();
+            return $result;
+        } catch (\Throwable $e) {
+            $this->rollback();
+            throw $e;
+        }
     }
 }

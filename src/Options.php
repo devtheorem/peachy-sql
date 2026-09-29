@@ -38,7 +38,8 @@ class Options
     ) {
         if ($this->driver === 'sqlsrv') {
             // https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server
-            $this->maxBoundParams = 2100 - 1;
+            // 3 of the 2,100 parameters are used by the call which executes a prepared statement
+            $this->maxBoundParams = 2100 - 3;
             $this->maxInsertRows = 1000;
             $this->affectedIsRowCount = false;
             $this->fetchNextSyntax = true;

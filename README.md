@@ -224,12 +224,14 @@ $ids = $result->ids; // e.g. [64, 66, 68]
 ```
 
 > [!NOTE]
-> SQL Server allows a maximum of 1,000 rows to be inserted at a time, and limits individual queries
-> to 2,099 or fewer bound parameters. MySQL and PostgreSQL support a maximum of 65,535 bound
+> SQL Server allows a maximum of 1,000 rows to be inserted at a time, and limits individual prepared
+> statements to 2,097 or fewer bound parameters. MySQL and PostgreSQL support a maximum of 65,535 bound
 > parameters per query. These limits can be easily reached when attempting to bulk-insert hundreds
 > or thousands of rows at a time. To avoid these limits, the `insertRows()` method automatically
 > splits row sets that exceed the limits into chunks to efficiently insert any number of rows
-> (`queryCount` contains the number of required queries).
+> (`queryCount` contains the number of required queries). When multiple queries are required, they
+> are run in a transaction unless one has already been started, so that if one of them fails, none
+> of the rows are inserted.
 
 #### updateRows and deleteFrom
 
@@ -248,6 +250,13 @@ $db->updateRows('Users', $newData, ['user_id' => 4]);
 // delete users with IDs 1, 2, and 3
 $userTable->deleteFrom('Users', ['user_id' => [1, 2, 3]]);
 ```
+
+If a query would have more bound parameters than the database allows (e.g. when deleting thousands
+of rows by ID), the largest list of values to match is split into chunks, and the chunks are updated
+or deleted in separate queries. These are run in a transaction unless one has already been started.
+A list can only be split if it's for an `eq` condition (since the other list operators have to match
+all the values in one query), and isn't for a column being set to a non-null value (since an updated
+row could then match a later chunk). If no list can be split, an exception is thrown.
 
 ### Transactions
 

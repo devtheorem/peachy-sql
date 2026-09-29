@@ -126,14 +126,28 @@ abstract class DbTestCase extends TestCase
             $this->assertStringContainsStringIgnoringCase('null', $e->getMessage());
         }
 
-        // none of the rows should be inserted when the last row of the batch fails
-        foreach ([null, 'user_id'] as $idColumn) {
-            try {
-                $db->insertRows($this->table, [[...$row, 'name' => 'failed batch'], $row], idColumn: $idColumn);
-                $this->fail('insertRows failed to throw exception');
-            } catch (SqlException $e) {
-                $this->assertStringContainsStringIgnoringCase('null', $e->getMessage());
+        $options = $db->options;
+        $maxBoundParams = $options->maxBoundParams;
+        $colVals = array_fill(0, 4, [...$row, 'name' => 'failed batch']);
+        $colVals[] = $row;
+
+        try {
+            // None of the rows should be inserted when the last row fails, including when the rows are split
+            // into batches (with a max of 8 bound parameters, the 5 rows are inserted 2 at a time).
+            foreach ([$maxBoundParams, 8] as $maxParams) {
+                $options->maxBoundParams = $maxParams;
+
+                foreach ([null, 'user_id'] as $idColumn) {
+                    try {
+                        $db->insertRows($this->table, $colVals, idColumn: $idColumn);
+                        $this->fail('insertRows failed to throw exception');
+                    } catch (SqlException $e) {
+                        $this->assertStringContainsStringIgnoringCase('null', $e->getMessage());
+                    }
+                }
             }
+        } finally {
+            $options->maxBoundParams = $maxBoundParams;
         }
 
         $inserted = $db->selectFrom("SELECT COUNT(*) AS inserted FROM {$this->table}")
@@ -457,6 +471,99 @@ abstract class DbTestCase extends TestCase
         // delete the inserted rows
         $numDeleted = $peachySql->deleteFrom($this->table, ['user_id' => $ids]);
         $this->assertSame($rowCount, $numDeleted);
+    }
+
+    private function countUsersNamed(string $name): int
+    {
+        /** @var array{c: int} $row */
+        $row = static::dbProvider()->selectFrom("SELECT COUNT(*) AS c FROM {$this->table}")
+            ->where(['name' => $name])->query()->getFirst();
+
+        return $row['c'];
+    }
+
+    /**
+     * Updates and deletes with more bound parameters than allowed are split into multiple queries.
+     */
+    public function testBatchedUpdateAndDelete(): void
+    {
+        $db = static::dbProvider();
+        $options = $db->options;
+        $maxBoundParams = $options->maxBoundParams;
+
+        // use SQL Server's limit, so that it's exceeded without a huge number of rows
+        $options->maxBoundParams = min($maxBoundParams, 2097);
+        $rowCount = $options->maxBoundParams + 1;
+
+        try {
+            $colVals = array_fill(0, $rowCount, ['name' => 'unbatched', 'dob' => '2000-01-01', 'weight' => 1, 'is_disabled' => false]);
+            $ids = $db->insertRows($this->table, $colVals, idColumn: 'user_id')->ids;
+
+            // with the name being set, there's one more bound parameter than the limit
+            $this->assertSame($rowCount, $db->updateRows($this->table, ['name' => 'batched'], ['user_id' => $ids]));
+            $batched = $this->countUsersNamed('batched');
+            $this->assertSame($rowCount, $batched);
+
+            // a transaction started by the caller isn't committed
+            $db->begin();
+            $db->updateRows($this->table, ['name' => 'rolled back'], ['user_id' => $ids]);
+            $db->rollback();
+            $batched = $this->countUsersNamed('batched');
+            $this->assertSame($rowCount, $batched);
+
+            // MySQL doesn't fail when comparing an integer column to an invalid string
+            if ($options->driver !== 'mysql') {
+                try {
+                    // the last batch fails, so the updates from the earlier batch should be rolled back
+                    $db->updateRows($this->table, ['name' => 'failed'], ['user_id' => [...$ids, 'invalid']]);
+                    $this->fail('updateRows failed to throw exception');
+                } catch (SqlException $e) {
+                    $batched = $this->countUsersNamed('batched');
+                    $this->assertSame($rowCount, $batched);
+                }
+            }
+
+            $this->assertSame($rowCount, $db->deleteFrom($this->table, ['user_id' => $ids, 'name' => 'batched']));
+            $this->assertSame(0, $this->countUsersNamed('batched'));
+        } finally {
+            $options->maxBoundParams = $maxBoundParams;
+        }
+    }
+
+    /**
+     * The list of values for a column being set to null can be split, since null can't match a later batch.
+     */
+    public function testBatchedUpdateSettingColumnToNull(): void
+    {
+        $db = static::dbProvider();
+        $db->query('DROP TABLE IF EXISTS NullBatchTest');
+        $db->query('CREATE TABLE NullBatchTest (id INT PRIMARY KEY, code INT NULL)');
+        $codes = range(1, 10);
+        $db->insertRows('NullBatchTest', array_map(fn($code) => ['id' => $code, 'code' => $code], $codes));
+
+        $options = $db->options;
+        $maxBoundParams = $options->maxBoundParams;
+        $options->maxBoundParams = 4; // with the value being set, the 10 codes are split into batches of 3
+        $thrown = null;
+
+        try {
+            $this->assertSame(10, $db->updateRows('NullBatchTest', ['code' => null], ['code' => $codes]));
+
+            try {
+                // a non-null value could match a later batch, so the list can't be split
+                $db->updateRows('NullBatchTest', ['code' => 0], ['code' => $codes]);
+            } catch (\Exception $e) {
+                $thrown = $e;
+            }
+        } finally {
+            $options->maxBoundParams = $maxBoundParams;
+        }
+
+        $this->assertInstanceOf(\Exception::class, $thrown);
+        $this->assertStringContainsString('can only be run as multiple queries', $thrown->getMessage());
+
+        $expected = array_map(fn($id) => ['id' => $id, 'code' => null], $codes);
+        $this->assertSame($expected, $db->query('SELECT id, code FROM NullBatchTest ORDER BY id')->getAll());
     }
 
     public function testEmptyBulkInsert(): void

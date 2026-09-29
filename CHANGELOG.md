@@ -6,8 +6,13 @@
   this returns the IDs from the insert query itself (using `MERGE ... OUTPUT` or `RETURNING`), so they
   are correct even when other connections insert into the same table at the same time, when inserting
   explicit identity values, and with any identity increment. With SQL Server, this requires 2016+.
+- `updateRows()` and `deleteFrom()` split queries with more bound parameters than allowed into multiple
+  queries (by splitting the largest list of values to match), which are run in a transaction unless
+  one has already been started.
 
 ### Fixed
+- The maximum number of bound parameters for SQL Server is now 2,097 rather than 2,099, since the call
+  which executes a prepared statement uses 3 of the 2,100 parameters SQL Server allows.
 - With SQL Server, `insertRow()` and `insertRows()` returned the wrong ID when an insert trigger
   inserted into another table with an identity column. The IDs now come from `SCOPE_IDENTITY()`
   rather than `@@IDENTITY` (like before v7.0).
@@ -21,6 +26,8 @@
 - With SQL Server, `insertRow()` and `insertRows()` no longer return IDs for tables and views with an
   `INSTEAD OF INSERT` trigger, as before v7.0. Since v7.0 these were computed from `@@IDENTITY`,
   which isn't reliable with concurrent inserts.
+- When `insertRows()` requires multiple queries, they're now run in a transaction unless one has
+  already been started, so that if one of them fails, none of the rows are inserted.
 
 
 ## [7.0.2] - 2026-08-06
