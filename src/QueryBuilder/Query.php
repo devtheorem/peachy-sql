@@ -50,13 +50,17 @@ class Query
             throw new \InvalidArgumentException('Identifier cannot be blank');
         }
 
-        $escaper = function (string $identifier): string {
-            $c = $this->options->identifierQuote;
-            return $c . str_replace($c, $c . $c, $identifier) . $c;
-        };
-
-        $qualifiedIdentifiers = array_map($escaper, explode('.', $identifier));
+        $qualifiedIdentifiers = array_map($this->quoteIdentifier(...), explode('.', $identifier));
         return implode('.', $qualifiedIdentifiers);
+    }
+
+    /**
+     * Quotes a single identifier (which may contain periods)
+     */
+    protected function quoteIdentifier(string $identifier): string
+    {
+        $c = $this->options->identifierQuote;
+        return $c . str_replace($c, $c . $c, $identifier) . $c;
     }
 
     /**

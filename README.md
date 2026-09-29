@@ -1,8 +1,8 @@
 # PeachySQL
 
 PeachySQL is a high-performance query builder and runner which streamlines prepared statements
-and working with large datasets. It is officially tested with MySQL, PostgreSQL, and SQL Server,
-but it should also work with any standards-compliant database which has a driver for PDO.
+and working with large datasets. It is officially tested with MySQL, PostgreSQL, and SQL Server
+(2016 or later), but it should also work with any standards-compliant database which has a driver for PDO.
 
 ## Install via Composer
 
@@ -194,8 +194,29 @@ $affected = $result->affected; // 3
 $queries = $result->queryCount; // 1
 ```
 
-An optional third parameter can be passed to `insertRows()` to override the default
-identity increment value:
+The `ids` are returned in the same order as the inserted rows. By default, they are computed from
+the last insert ID. With SQL Server and PostgreSQL, this can be incorrect if other connections are
+inserting into the same table at the same time, so you can instead pass the table's identity column
+as the `idColumn` argument to return the IDs from the insert query itself (via `MERGE ... OUTPUT`
+or `RETURNING`):
+
+```php
+$result = $db->insertRows('Users', $userData, idColumn: 'user_id');
+```
+
+This is also correct when inserting explicit identity values, and with any identity increment.
+Only pass `idColumn` for tables with an identity column, since the query will otherwise fail
+(or return the wrong IDs, if it's a different column). With SQL Server, don't pass it
+for a table or view with an `INSTEAD OF INSERT` trigger either, since the IDs of rows inserted by the
+trigger can't be output (without `idColumn`, no IDs are returned for these).
+
+`insertRow()` also accepts an `idColumn` argument, but only needs it with PostgreSQL, where the ID
+otherwise comes from `lastval()`. This returns the last value from any sequence in the session,
+e.g. one used by an insert trigger, or from a previous insert into a different table.
+
+With MySQL, `idColumn` isn't used, since InnoDB assigns consecutive IDs for multi-row inserts.
+When the IDs are computed from the last insert ID and the identity increment isn't 1 (e.g. if your
+MySQL server uses a different `auto_increment_increment`), pass it as the optional third parameter:
 
 ```php
 $result = $db->insertRows('Users', $userData, 2);

@@ -100,4 +100,40 @@ class InsertTest extends TestCase
         $this->assertSame($expected, $actual->sql);
         $this->assertSame(['foo1', 'foo2', 'bar1', 'bar2'], $actual->params);
     }
+
+    public function testBuildReturningQuery(): void
+    {
+        $colVals = [['col1' => 'foo1'], ['col1' => 'bar1']];
+        $actual = (new Insert(new Options('pgsql')))->buildReturningQuery('TestTable', $colVals, 'my"id');
+        $expected = 'INSERT INTO TestTable ("col1") VALUES (?), (?) RETURNING "my""id" AS id';
+        $this->assertSame($expected, $actual->sql);
+        $this->assertSame(['foo1', 'bar1'], $actual->params);
+    }
+
+    public function testBuildScopeIdentityQuery(): void
+    {
+        $colVals = [['col1' => 'foo1', 'col2' => 'foo2'], ['col1' => 'bar1', 'col2' => 'bar2']];
+        $actual = (new Insert(new Options('sqlsrv')))->buildScopeIdentityQuery('TestTable', $colVals);
+        $expected = 'INSERT INTO TestTable ("col1", "col2") VALUES (?,?), (?,?);'
+            . ' SELECT CAST(SCOPE_IDENTITY() AS bigint) AS id, @@ROWCOUNT AS affected';
+        $this->assertSame($expected, $actual->sql);
+        $this->assertSame(['foo1', 'foo2', 'bar1', 'bar2'], $actual->params);
+    }
+
+    public function testBuildMergeOutputQuery(): void
+    {
+        $colVals = [
+            ['col1' => 'foo1', 'col2' => 'foo2'],
+            ['col1' => 'bar1', 'col2' => 'bar2'],
+        ];
+
+        $actual = (new Insert(new Options('sqlsrv')))->buildMergeOutputQuery('TestTable', $colVals, 'my"id');
+        $expected = 'DECLARE @ids TABLE (id bigint, _rn int);'
+            . ' MERGE INTO TestTable USING (VALUES (?,?,0), (?,?,1)) AS v (p0, p1, _rn) ON 1 = 0'
+            . ' WHEN NOT MATCHED THEN INSERT ("col1", "col2") VALUES (v.p0, v.p1)'
+            . ' OUTPUT inserted."my""id", v._rn INTO @ids;'
+            . ' SELECT (SELECT id FROM @ids ORDER BY _rn FOR JSON PATH) AS ids';
+        $this->assertSame($expected, $actual->sql);
+        $this->assertSame(['foo1', 'foo2', 'bar1', 'bar2'], $actual->params);
+    }
 }

@@ -4,6 +4,7 @@ namespace DevTheorem\PeachySQL\Test;
 
 use DevTheorem\PeachySQL\{PeachySql, SqlException};
 use DevTheorem\PeachySQL\QueryBuilder\SqlParams;
+use PDO;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 
@@ -19,13 +20,40 @@ abstract class DbTestCase extends TestCase
      */
     abstract public static function dbProvider(): PeachySql;
 
+    abstract public static function createConnection(): PDO;
+
     abstract protected function getExpectedBadSyntaxCode(): int;
 
     abstract protected function getExpectedBadSyntaxError(): string;
 
+    abstract protected function getIdentityColumnDefinition(): string;
+
+    /**
+     * Returns statements which create a TriggerTest table with an insert trigger
+     * that inserts into a TriggerAudit table having IDs starting from 5000.
+     * @return list<string>
+     */
+    abstract protected function getTriggerTestSql(): array;
+
     protected function getExpectedBadSqlState(): string
     {
         return '42000';
+    }
+
+    /**
+     * Returns rows with explicit IDs from 1 to $count in a shuffled (but deterministic) order.
+     * @return list<array{id: int, name: string}>
+     */
+    protected static function getShuffledIdRows(int $count): array
+    {
+        $rows = [];
+
+        for ($i = 0; $i < $count; $i++) {
+            $id = ($i * 7919) % $count + 1; // a permutation since 7919 is prime
+            $rows[] = ['id' => $id, 'name' => "row{$id}"];
+        }
+
+        return $rows;
     }
 
     public function testNoIdentityInsert(): void
@@ -52,6 +80,139 @@ abstract class DbTestCase extends TestCase
         $this->assertSame(2, $result->affected);
         $this->assertCount(0, $result->ids);
         $this->assertSame($colVals, $peachySql->query("SELECT * FROM Test WHERE name <> 'multi'")->getAll());
+    }
+
+    public function testInsertIdsWithTrigger(): void
+    {
+        $db = static::dbProvider();
+        $conn = static::createConnection();
+
+        // without an ID column, PostgreSQL gets the ID from lastval(), which is from the trigger's sequence
+        $idColumns = $db->options->driver === 'pgsql' ? ['id'] : [null, 'id'];
+
+        foreach ($idColumns as $idColumn) {
+            foreach ($this->getTriggerTestSql() as $sql) {
+                $conn->exec($sql);
+            }
+
+            $single = $db->insertRow('TriggerTest', ['name' => 'single'], $idColumn);
+            $this->assertSame(1, $single->affected);
+
+            $bulk = $db->insertRows('TriggerTest', [['name' => 'a'], ['name' => 'b'], ['name' => 'c']], idColumn: $idColumn);
+            $this->assertSame(3, $bulk->affected);
+            $this->assertCount(3, $bulk->ids);
+
+            $expected = [
+                ['id' => $single->id, 'name' => 'single'],
+                ['id' => $bulk->ids[0], 'name' => 'a'],
+                ['id' => $bulk->ids[1], 'name' => 'b'],
+                ['id' => $bulk->ids[2], 'name' => 'c'],
+            ];
+
+            $this->assertSame($expected, $db->query('SELECT id, name FROM TriggerTest ORDER BY id')->getAll());
+            $this->assertSame(['audit_count' => 4], $db->query('SELECT COUNT(*) AS audit_count FROM TriggerAudit')->getFirst());
+        }
+    }
+
+    public function testFailedInsertThrows(): void
+    {
+        $db = static::dbProvider();
+        $row = ['name' => null, 'dob' => '2000-01-01', 'weight' => 1, 'is_disabled' => false];
+
+        try {
+            $db->insertRow($this->table, $row);
+            $this->fail('insertRow failed to throw exception');
+        } catch (SqlException $e) {
+            $this->assertStringContainsStringIgnoringCase('null', $e->getMessage());
+        }
+
+        // none of the rows should be inserted when the last row of the batch fails
+        foreach ([null, 'user_id'] as $idColumn) {
+            try {
+                $db->insertRows($this->table, [[...$row, 'name' => 'failed batch'], $row], idColumn: $idColumn);
+                $this->fail('insertRows failed to throw exception');
+            } catch (SqlException $e) {
+                $this->assertStringContainsStringIgnoringCase('null', $e->getMessage());
+            }
+        }
+
+        $inserted = $db->selectFrom("SELECT COUNT(*) AS inserted FROM {$this->table}")
+            ->where(['name' => 'failed batch'])->query()->getFirst();
+        $this->assertSame(['inserted' => 0], $inserted);
+    }
+
+    /**
+     * Bulk inserts rows from multiple processes at the same time with an ID column, and verifies
+     * that each returned ID belongs to the row that was inserted by that process.
+     */
+    public function testConcurrentInsertIds(): void
+    {
+        $db = static::dbProvider();
+        $db->query('DROP TABLE IF EXISTS ConcurrentTest');
+        $db->query('CREATE TABLE ConcurrentTest (id ' . $this->getIdentityColumnDefinition()
+            . ', worker INT NOT NULL, batch INT NOT NULL, seq INT NOT NULL)');
+
+        $workers = 6;
+        $batches = 15;
+        $rowsPerBatch = 500;
+        $startTime = microtime(true) + 1.5; // allow time for all the processes to start
+        $processes = [];
+
+        for ($worker = 0; $worker < $workers; $worker++) {
+            $command = [
+                PHP_BINARY, __DIR__ . '/insert-worker.php', static::class, 'ConcurrentTest',
+                (string) $worker, (string) $batches, (string) $rowsPerBatch, (string) $startTime,
+            ];
+
+            $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, dirname(__DIR__));
+
+            if ($process === false) {
+                throw new \Exception('Failed to start insert worker');
+            }
+
+            $processes[$worker] = [$process, $pipes];
+        }
+
+        $expected = [];
+
+        foreach ($processes as $worker => [$process, $pipes]) {
+            $output = stream_get_contents($pipes[1]);
+            $errors = stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            $this->assertSame(0, proc_close($process), "Insert worker {$worker} failed: {$output} {$errors}");
+
+            /** @var list<list<int>> $batchIds */
+            $batchIds = json_decode((string) $output, true, flags: JSON_THROW_ON_ERROR);
+            $this->assertCount($batches, $batchIds);
+
+            foreach ($batchIds as $batch => $ids) {
+                $this->assertCount($rowsPerBatch, $ids);
+
+                foreach ($ids as $seq => $id) {
+                    $expected[$id] = ['id' => $id, 'worker' => $worker, 'batch' => $batch, 'seq' => $seq];
+                }
+            }
+        }
+
+        $actual = $db->query('SELECT id, worker, batch, seq FROM ConcurrentTest')->getAll();
+        $this->assertSame($workers * $batches * $rowsPerBatch, count($actual));
+        $this->assertSame(count($actual), count($expected), 'Duplicate IDs were returned');
+
+        // compare the rows individually, since diffing large arrays on failure is extremely slow
+        $mismatches = [];
+
+        foreach ($actual as $row) {
+            /** @var int $id */
+            $id = $row['id'];
+
+            if (($expected[$id] ?? null) !== $row) {
+                $mismatches[] = ['returned' => $expected[$id] ?? null, 'actual' => $row];
+            }
+        }
+
+        $message = count($mismatches) . ' returned IDs do not match the inserted row';
+        $this->assertSame([], array_slice($mismatches, 0, 3), $message);
     }
 
     public function testTransactions(): void

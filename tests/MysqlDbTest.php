@@ -22,16 +22,36 @@ class MysqlDbTest extends DbTestCase
         return 'error in your SQL syntax';
     }
 
+    protected function getIdentityColumnDefinition(): string
+    {
+        return 'INT AUTO_INCREMENT PRIMARY KEY';
+    }
+
+    protected function getTriggerTestSql(): array
+    {
+        return [
+            'DROP TABLE IF EXISTS TriggerTest',
+            'DROP TABLE IF EXISTS TriggerAudit',
+            'CREATE TABLE TriggerAudit (audit_id INT AUTO_INCREMENT PRIMARY KEY, note INT NOT NULL) AUTO_INCREMENT = 5000',
+            'CREATE TABLE TriggerTest (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(50) NOT NULL)',
+            'CREATE TRIGGER TriggerTestAudit AFTER INSERT ON TriggerTest FOR EACH ROW
+                INSERT INTO TriggerAudit (note) VALUES (NEW.id)',
+        ];
+    }
+
+    public static function createConnection(): PDO
+    {
+        $c = App::$config;
+
+        return new PDO($c->mysqlDsn, $c->mysqlUser, $c->mysqlPassword, [
+            PDO::ATTR_EMULATE_PREPARES => false,
+        ]);
+    }
+
     public static function dbProvider(): PeachySql
     {
         if (!self::$db) {
-            $c = App::$config;
-
-            $pdo = new PDO($c->mysqlDsn, $c->mysqlUser, $c->mysqlPassword, [
-                PDO::ATTR_EMULATE_PREPARES => false,
-            ]);
-
-            self::$db = self::createTestTable(new PeachySql($pdo));
+            self::$db = self::createTestTable(new PeachySql(self::createConnection()));
         }
 
         return self::$db;

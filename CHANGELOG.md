@@ -1,5 +1,25 @@
 # Changelog
 
+## [Unreleased]
+### Added
+- Optional `idColumn` parameter for `insertRow()` and `insertRows()`. With SQL Server and PostgreSQL,
+  this returns the IDs from the insert query itself (using `MERGE ... OUTPUT` or `RETURNING`), so they
+  are correct even when other connections insert into the same table at the same time, when inserting
+  explicit identity values, and with any identity increment. With SQL Server, this requires 2016+.
+
+### Fixed
+- With SQL Server, `insertRow()` and `insertRows()` returned the wrong ID when an insert trigger
+  inserted into another table with an identity column. The IDs now come from `SCOPE_IDENTITY()`
+  rather than `@@IDENTITY` (like before v7.0).
+- With SQL Server, the affected count from `insertRow()` and `insertRows()` no longer includes
+  rows inserted by triggers.
+
+### Changed
+- With SQL Server, `insertRow()` and `insertRows()` no longer return IDs for tables and views with an
+  `INSTEAD OF INSERT` trigger, as before v7.0. Since v7.0 these were computed from `@@IDENTITY`,
+  which isn't reliable with concurrent inserts.
+
+
 ## [7.0.2] - 2026-08-06
 ### Changed
 - `Statement::getAll()` is now annotated as returning `list<mixed[]>` rather than an
