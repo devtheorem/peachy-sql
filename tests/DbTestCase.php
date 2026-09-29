@@ -152,7 +152,7 @@ abstract class DbTestCase extends TestCase
 
         $ids = $peachySql->insertRows($this->table, $insertColVals)->ids;
         $sql = "SELECT user_id, name, dob, weight, is_disabled, uuid FROM {$this->table}";
-        $iterator = $peachySql->selectFrom($sql)->where(['user_id' => $ids])->query()->getIterator();
+        $iterator = $peachySql->selectFrom($sql)->where(['user_id' => $ids])->orderBy(['user_id'])->query()->getIterator();
 
         $this->assertInstanceOf(\Generator::class, $iterator);
         $colValsCompare = [];
@@ -202,7 +202,7 @@ abstract class DbTestCase extends TestCase
         $stmt->close();
 
         $result = $peachySql->selectFrom("SELECT user_id, name, uuid FROM {$this->table}")
-            ->where(['user_id' => $ids])->query();
+            ->where(['user_id' => $ids])->orderBy(['user_id'])->query();
         $updatedNames = $result->getAll();
         $this->assertSame($options->affectedIsRowCount ? 2 : -1, $result->getAffected());
 
@@ -253,7 +253,7 @@ abstract class DbTestCase extends TestCase
         $columns = implode(', ', array_keys($colVals[0]));
 
         $rows = $peachySql->selectFrom("SELECT {$columns} FROM {$this->table}")
-            ->where(['user_id' => $ids])->query()->getAll();
+            ->where(['user_id' => $ids])->orderBy(['user_id'])->query()->getAll();
 
         if ($options->binarySelectedAsStream || $options->nativeBoolColumns || $options->floatSelectedAsString) {
             /** @var array{weight: float|string, is_disabled: int|bool, uuid: string|resource} $row */
