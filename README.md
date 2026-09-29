@@ -214,6 +214,10 @@ trigger can't be output (without `idColumn`, no IDs are returned for these).
 otherwise comes from `lastval()`. This returns the last value from any sequence in the session,
 e.g. one used by an insert trigger, or from a previous insert into a different table.
 
+With PostgreSQL, passing `idColumn` to `insertRow()` or `insertRows()` is also faster, since getting
+the last insert ID requires a separate `SELECT LASTVAL()` query, whereas `RETURNING` returns the IDs
+along with the insert.
+
 With MySQL, `idColumn` isn't used, since InnoDB assigns consecutive IDs for multi-row inserts.
 When the IDs are computed from the last insert ID and the identity increment isn't 1 (e.g. if your
 MySQL server uses a different `auto_increment_increment`), pass it as the optional third parameter:

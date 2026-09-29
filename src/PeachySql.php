@@ -54,7 +54,6 @@ class PeachySql
         $this->nestingLevel = 0;
 
         if (!$this->conn->beginTransaction()) {
-            /** @phpstan-ignore argument.type */
             throw $this->getError('Failed to begin transaction', $this->conn->errorInfo());
         }
     }
@@ -79,7 +78,6 @@ class PeachySql
         }
 
         if (!$this->conn->commit()) {
-            /** @phpstan-ignore argument.type */
             throw $this->getError('Failed to commit transaction', $this->conn->errorInfo());
         }
     }
@@ -101,7 +99,6 @@ class PeachySql
         }
 
         if (!$this->conn->rollback()) {
-            /** @phpstan-ignore argument.type */
             throw $this->getError('Failed to roll back transaction', $this->conn->errorInfo());
         }
     }
@@ -180,7 +177,6 @@ class PeachySql
         }
 
         if (!$success) {
-            /** @phpstan-ignore argument.type */
             throw $this->getError("Failed to execute {$sql}", $this->conn->errorInfo());
         }
     }
@@ -196,16 +192,19 @@ class PeachySql
     }
 
     /**
-     * @param array{0: string, 1: int|null, 2: string|null} $error
+     * @param mixed[] $error The array returned by PDO::errorInfo() or PDOStatement::errorInfo()
      * @internal
      */
     public static function getError(string $message, array $error): SqlException
     {
-        $code = $error[1] ?? 0;
-        $details = $error[2] ?? '';
-        $sqlState = $error[0];
+        [$sqlState, $code, $details] = $error + [null, null, null];
 
-        return new SqlException($message, $code, $details, $sqlState);
+        return new SqlException(
+            $message,
+            is_int($code) ? $code : 0,
+            is_string($details) ? $details : '',
+            is_string($sqlState) ? $sqlState : '',
+        );
     }
 
     /**
@@ -217,7 +216,6 @@ class PeachySql
     {
         try {
             if (!$stmt = $this->conn->prepare($sql)) {
-                /** @phpstan-ignore argument.type */
                 throw $this->getError('Failed to prepare statement', $this->conn->errorInfo());
             }
 
@@ -237,7 +235,6 @@ class PeachySql
                 }
             }
         } catch (\PDOException $e) {
-            /** @phpstan-ignore argument.type */
             throw $this->getError('Failed to prepare statement', $this->conn->errorInfo());
         }
 
@@ -292,20 +289,15 @@ class PeachySql
             }
         }
 
-        if ($lastId) {
-            if ($this->options->lastIdIsFirstOfBatch) {
-                $firstId = $lastId;
-                $lastId = $firstId + $identityIncrement * (count($colVals) - 1);
-            } else {
-                $firstId = $lastId - $identityIncrement * (count($colVals) - 1);
-            }
-
-            $ids = range($firstId, $lastId, $identityIncrement);
-        } else {
-            $ids = [];
+        if (!$lastId) {
+            return new BulkInsertResult([], $affected);
         }
 
-        return new BulkInsertResult($ids, $affected);
+        // depending on the database, the last insert ID is the ID of the first or last row in the batch
+        $offset = $identityIncrement * (count($colVals) - 1);
+        $firstId = $this->options->lastIdIsFirstOfBatch ? $lastId : $lastId - $offset;
+
+        return new BulkInsertResult(range($firstId, $firstId + $offset, $identityIncrement), $affected);
     }
 
     private function insertReturningIds(SqlParams $sqlParams): BulkInsertResult
@@ -363,16 +355,17 @@ class PeachySql
         $batches = Insert::batchRows($colVals, $this->options->maxBoundParams, $this->options->maxInsertRows);
 
         $insertBatches = function () use ($table, $batches, $identityIncrement, $idColumn): BulkInsertResult {
-            $ids = [];
+            $batchIds = [];
             $affected = 0;
 
             foreach ($batches as $batch) {
                 $result = $this->insertBatch($table, $batch, $identityIncrement, $idColumn);
-                $ids = array_merge($ids, $result->ids);
+                $batchIds[] = $result->ids;
                 $affected += $result->affected;
             }
 
-            return new BulkInsertResult($ids, $affected, count($batches));
+            // merging the IDs once is much faster than after each batch when there are many batches
+            return new BulkInsertResult(array_merge(...$batchIds), $affected, count($batches));
         };
 
         return count($batches) > 1 ? $this->transaction($insertBatches) : $insertBatches();

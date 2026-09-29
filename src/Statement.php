@@ -36,11 +36,9 @@ class Statement
 
         try {
             if (!$this->stmt->execute()) {
-                /** @phpstan-ignore argument.type */
                 throw PeachySql::getError('Failed to execute prepared statement', $this->stmt->errorInfo());
             }
         } catch (PDOException $e) {
-            /** @phpstan-ignore argument.type */
             throw PeachySql::getError('Failed to execute prepared statement', $this->stmt->errorInfo());
         }
 
@@ -76,7 +74,6 @@ class Statement
                     yield $row;
                 }
             } catch (PDOException $e) {
-                /** @phpstan-ignore argument.type */
                 throw PeachySql::getError('Failed to fetch row', $stmt->errorInfo());
             }
 
@@ -85,7 +82,6 @@ class Statement
             $sqlState = (string) $stmt->errorCode();
 
             if (!in_array(substr($sqlState, 0, 2), ['', '00', '01', '02'], true)) {
-                /** @phpstan-ignore argument.type */
                 throw PeachySql::getError('Failed to fetch row', $stmt->errorInfo());
             }
 

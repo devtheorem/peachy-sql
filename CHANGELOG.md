@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [7.1.0] - 2026-09-29
 ### Added
 - Optional `idColumn` parameter for `insertRow()` and `insertRows()`. With SQL Server and PostgreSQL,
   this returns the IDs from the insert query itself (using `MERGE ... OUTPUT` or `RETURNING`), so they
@@ -36,6 +36,8 @@
   which isn't reliable with concurrent inserts.
 - When `insertRows()` requires multiple queries, they're now run in a transaction (or a savepoint,
   if a transaction has already been started), so that if one of them fails, none of the rows are inserted.
+- Improved the performance of `insertRows()` calls which require many queries. The IDs from each query
+  were merged into a growing array, which took over 2 seconds for a million rows inserted with SQL Server.
 
 
 ## [7.0.2] - 2026-08-06
@@ -393,6 +395,7 @@ return the value of their callback function, making it easier to use data outsid
 - Initial release
 
 
+[7.1.0]: https://github.com/devtheorem/peachy-sql/compare/v7.0.2...v7.1.0
 [7.0.2]: https://github.com/devtheorem/peachy-sql/compare/v7.0.1...v7.0.2
 [7.0.1]: https://github.com/devtheorem/peachy-sql/compare/v7.0.0...v7.0.1
 [7.0.0]: https://github.com/devtheorem/peachy-sql/compare/v6.3.1...v7.0.0
