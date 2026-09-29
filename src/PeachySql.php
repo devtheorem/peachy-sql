@@ -301,7 +301,7 @@ class PeachySql
         $maxParams = $this->options->maxBoundParams;
 
         if ($maxParams <= 0 || $paramCount <= $maxParams) {
-            return $this->query($sqlParams->sql, $sqlParams->params)->getAffected();
+            return $this->runAffectingRows($sqlParams);
         }
 
         $batches = Query::batchWhere($where, $paramCount, $maxParams, $excludedColumns);
@@ -310,12 +310,26 @@ class PeachySql
             $affected = 0;
 
             foreach ($batches as $batchWhere) {
-                $batchParams = $buildQuery($batchWhere);
-                $affected += $this->query($batchParams->sql, $batchParams->params)->getAffected();
+                $affected += $this->runAffectingRows($buildQuery($batchWhere));
             }
 
             return $affected;
         });
+    }
+
+    /**
+     * Runs an update or delete query, and returns the number of affected rows. With SQL Server, the count is
+     * selected from @@ROWCOUNT, since the query's row count would otherwise include rows changed by triggers.
+     */
+    private function runAffectingRows(SqlParams $sqlParams): int
+    {
+        if ($this->options->driver === 'sqlsrv') {
+            /** @var array{affected: int|string} $row */
+            $row = $this->query($sqlParams->sql . '; SELECT @@ROWCOUNT AS affected', $sqlParams->params)->getFirst();
+            return (int) $row['affected'];
+        }
+
+        return $this->query($sqlParams->sql, $sqlParams->params)->getAffected();
     }
 
     /**

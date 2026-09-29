@@ -99,6 +99,43 @@ class MssqlDbTest extends DbTestCase
         }
     }
 
+    /**
+     * The affected count from updateRows() and deleteFrom() shouldn't include rows changed by triggers.
+     */
+    public function testAffectedCountWithTrigger(): void
+    {
+        $db = static::dbProvider();
+        $db->query('DROP TABLE IF EXISTS AffectedTest');
+        $db->query('DROP TABLE IF EXISTS AffectedAudit');
+        $db->query('CREATE TABLE AffectedAudit (id INT IDENTITY PRIMARY KEY, note INT NOT NULL)');
+        $db->query('CREATE TABLE AffectedTest (id INT PRIMARY KEY, name NVARCHAR(50) NOT NULL)');
+        $db->query('CREATE TRIGGER AffectedTestAudit ON AffectedTest AFTER UPDATE, DELETE AS
+            INSERT INTO AffectedAudit (note) SELECT id FROM deleted;
+            INSERT INTO AffectedAudit (note) SELECT id FROM deleted');
+
+        $options = $db->options;
+        $maxBoundParams = $options->maxBoundParams;
+        $ids = [1, 2, 3];
+
+        try {
+            // with a max of 3 bound parameters, the updates and deletes are split into multiple queries
+            foreach ([$maxBoundParams, 3] as $maxParams) {
+                $options->maxBoundParams = $maxParams;
+                $db->insertRows('AffectedTest', array_map(fn($id) => ['id' => $id, 'name' => 'a'], $ids));
+
+                $this->assertSame(3, $db->updateRows('AffectedTest', ['name' => 'b'], ['id' => $ids]));
+                $this->assertSame(2, $db->updateRows('AffectedTest', ['name' => 'c'], ['id' => ['eq' => $ids, 'ne' => 1]]));
+                $this->assertSame(3, $db->deleteFrom('AffectedTest', ['id' => $ids]));
+            }
+        } finally {
+            $options->maxBoundParams = $maxBoundParams;
+        }
+
+        // the trigger added 2 audit rows for each updated or deleted row
+        $audit = $db->query('SELECT COUNT(*) AS audit_count FROM AffectedAudit')->getFirst();
+        $this->assertSame(['audit_count' => 2 * (3 + 2 + 3) * 2], $audit);
+    }
+
     public function testFetchErrorThrowsSqlException(): void
     {
         // without ORDER BY, rows are sent as they're computed, so the error on the last row occurs while fetching

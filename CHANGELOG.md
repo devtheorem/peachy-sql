@@ -16,8 +16,8 @@
 - With SQL Server, `insertRow()` and `insertRows()` returned the wrong ID when an insert trigger
   inserted into another table with an identity column. The IDs now come from `SCOPE_IDENTITY()`
   rather than `@@IDENTITY` (like before v7.0).
-- With SQL Server, the affected count from `insertRow()` and `insertRows()` no longer includes
-  rows inserted by triggers.
+- With SQL Server, the affected count from `insertRow()`, `insertRows()`, `updateRows()`, and
+  `deleteFrom()` no longer includes rows changed by triggers.
 - An error while fetching a row (e.g. a conversion error in a SQL Server result that's sent as it's
   computed) threw a `PDOException` rather than a `SqlException`. Without the exception error mode,
   the error was ignored and the results ended early.
