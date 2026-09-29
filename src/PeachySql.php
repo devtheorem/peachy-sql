@@ -13,9 +13,14 @@ use PDO;
  */
 class PeachySql
 {
+    private const SAVEPOINT_PREFIX = 'peachy_savepoint_';
+
     public Options $options;
     private PDO $conn;
     private bool $usedPrepare = true;
+
+    /** The number of nested transactions (savepoints) in the current transaction */
+    private int $nestingLevel = 0;
 
     public function __construct(PDO $connection, ?Options $options = null)
     {
@@ -31,11 +36,23 @@ class PeachySql
     }
 
     /**
-     * Begins a transaction
+     * Begins a transaction. If a transaction has already been started, a savepoint is created instead,
+     * so that the matching commit() or rollback() only applies to the changes made after this call.
      * @throws SqlException if an error occurs
      */
     public function begin(): void
     {
+        if ($this->conn->inTransaction()) {
+            $savepoint = self::SAVEPOINT_PREFIX . ($this->nestingLevel + 1);
+            $sql = $this->options->driver === 'sqlsrv' ? "SAVE TRANSACTION {$savepoint}" : "SAVEPOINT {$savepoint}";
+            $this->execTransactionStatement($sql);
+            $this->nestingLevel++;
+            return;
+        }
+
+        // any savepoints from a transaction that wasn't ended with commit() or rollback() no longer exist
+        $this->nestingLevel = 0;
+
         if (!$this->conn->beginTransaction()) {
             /** @phpstan-ignore argument.type */
             throw $this->getError('Failed to begin transaction', $this->conn->errorInfo());
@@ -43,11 +60,24 @@ class PeachySql
     }
 
     /**
-     * Commits a transaction begun with begin()
+     * Commits a transaction begun with begin(), or releases its savepoint if it was nested in another transaction.
+     * @throws TransactionRolledBackException if the savepoint no longer exists, since an error rolled back
+     *                                        the entire transaction (e.g. a deadlock with SQL Server or MySQL)
      * @throws SqlException if an error occurs
      */
     public function commit(): void
     {
+        if ($this->nestingLevel > 0) {
+            $savepoint = self::SAVEPOINT_PREFIX . $this->nestingLevel--;
+
+            // SQL Server doesn't support releasing a savepoint
+            if ($this->options->driver !== 'sqlsrv') {
+                $this->endSavepoint("RELEASE SAVEPOINT {$savepoint}");
+            }
+
+            return;
+        }
+
         if (!$this->conn->commit()) {
             /** @phpstan-ignore argument.type */
             throw $this->getError('Failed to commit transaction', $this->conn->errorInfo());
@@ -55,14 +85,103 @@ class PeachySql
     }
 
     /**
-     * Rolls back a transaction begun with begin()
+     * Rolls back a transaction begun with begin(), or only the changes made since then if it was nested
+     * in another transaction.
+     * @throws TransactionRolledBackException if the savepoint no longer exists, since an error rolled back
+     *                                        the entire transaction (e.g. a deadlock with SQL Server or MySQL)
      * @throws SqlException if an error occurs
      */
     public function rollback(): void
     {
+        if ($this->nestingLevel > 0) {
+            $savepoint = self::SAVEPOINT_PREFIX . $this->nestingLevel--;
+            $sqlsrv = $this->options->driver === 'sqlsrv';
+            $this->endSavepoint($sqlsrv ? "ROLLBACK TRANSACTION {$savepoint}" : "ROLLBACK TO SAVEPOINT {$savepoint}");
+            return;
+        }
+
         if (!$this->conn->rollback()) {
             /** @phpstan-ignore argument.type */
             throw $this->getError('Failed to roll back transaction', $this->conn->errorInfo());
+        }
+    }
+
+    /**
+     * Runs the function in a transaction, which is committed if the function returns, or rolled back
+     * if it throws an exception (which is then rethrown). If a transaction has already been started,
+     * a savepoint is used instead, so only the changes made by the function are rolled back.
+     * @template T
+     * @param Closure(self): T $fn
+     * @throws TransactionRolledBackException if the function is nested in another transaction, and throws an error
+     *                                        which rolled back the entire transaction (e.g. due to a deadlock)
+     * @throws SqlException if an error occurs when starting, committing, or rolling back the transaction
+     * @return T The value returned by the function
+     */
+    public function transaction(Closure $fn): mixed
+    {
+        $nested = $this->conn->inTransaction();
+        $this->begin();
+
+        try {
+            $result = $fn($this);
+        } catch (\Throwable $e) {
+            try {
+                $this->rollback();
+            } catch (TransactionRolledBackException) {
+                // the outer transaction can't continue as if its earlier changes weren't also rolled back
+                throw $e instanceof TransactionRolledBackException ? $e : new TransactionRolledBackException($e);
+            } catch (\Throwable) {
+                // the original exception is more useful (e.g. if the connection was lost)
+            }
+
+            throw $e;
+        }
+
+        try {
+            $this->commit();
+        } catch (\Throwable $e) {
+            if (!$nested && $this->conn->inTransaction()) {
+                try {
+                    $this->rollback();
+                } catch (\Throwable) {
+                    // the original exception is more useful
+                }
+            }
+
+            throw $e;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Releases or rolls back to a savepoint.
+     * @throws TransactionRolledBackException if this fails, since the savepoint no longer exists
+     */
+    private function endSavepoint(string $sql): void
+    {
+        try {
+            $this->execTransactionStatement($sql);
+        } catch (SqlException $e) {
+            throw new TransactionRolledBackException($e);
+        }
+    }
+
+    /**
+     * Savepoint statements are executed directly, since MySQL doesn't support them in prepared statements.
+     * @throws SqlException if an error occurs
+     */
+    private function execTransactionStatement(string $sql): void
+    {
+        try {
+            $success = $this->conn->exec($sql) !== false;
+        } catch (\PDOException $e) {
+            $success = false;
+        }
+
+        if (!$success) {
+            /** @phpstan-ignore argument.type */
+            throw $this->getError("Failed to execute {$sql}", $this->conn->errorInfo());
         }
     }
 
@@ -256,7 +375,7 @@ class PeachySql
             return new BulkInsertResult($ids, $affected, count($batches));
         };
 
-        return count($batches) > 1 ? $this->runInTransaction($insertBatches) : $insertBatches();
+        return count($batches) > 1 ? $this->transaction($insertBatches) : $insertBatches();
     }
 
     /**
@@ -288,8 +407,7 @@ class PeachySql
 
     /**
      * Runs the query built for the where clause, and returns the number of affected rows. If the query has
-     * more bound parameters than allowed, it's split into multiple queries which are run in a transaction
-     * (unless a transaction has already been started).
+     * more bound parameters than allowed, it's split into multiple queries which are run with transaction().
      * @param WhereClause $where
      * @param Closure(WhereClause): SqlParams $buildQuery
      * @param string[] $excludedColumns Columns which can't be used to split the query
@@ -306,7 +424,7 @@ class PeachySql
 
         $batches = Query::batchWhere($where, $paramCount, $maxParams, $excludedColumns);
 
-        return $this->runInTransaction(function () use ($batches, $buildQuery): int {
+        return $this->transaction(function () use ($batches, $buildQuery): int {
             $affected = 0;
 
             foreach ($batches as $batchWhere) {
@@ -330,30 +448,5 @@ class PeachySql
         }
 
         return $this->query($sqlParams->sql, $sqlParams->params)->getAffected();
-    }
-
-    /**
-     * Runs the function in a transaction (unless one has already been started), so that if it runs multiple
-     * queries, a failure doesn't leave the changes from some of them committed.
-     * @template T
-     * @param Closure(): T $fn
-     * @return T
-     */
-    private function runInTransaction(Closure $fn): mixed
-    {
-        if ($this->conn->inTransaction()) {
-            return $fn();
-        }
-
-        $this->begin();
-
-        try {
-            $result = $fn();
-            $this->commit();
-            return $result;
-        } catch (\Throwable $e) {
-            $this->rollback();
-            throw $e;
-        }
     }
 }

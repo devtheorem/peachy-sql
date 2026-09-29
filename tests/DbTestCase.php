@@ -2,7 +2,7 @@
 
 namespace DevTheorem\PeachySQL\Test;
 
-use DevTheorem\PeachySQL\{PeachySql, SqlException};
+use DevTheorem\PeachySQL\{PeachySql, SqlException, TransactionRolledBackException};
 use DevTheorem\PeachySQL\QueryBuilder\SqlParams;
 use PDO;
 use PHPUnit\Framework\TestCase;
@@ -227,6 +227,142 @@ abstract class DbTestCase extends TestCase
 
         $message = count($mismatches) . ' returned IDs do not match the inserted row';
         $this->assertSame([], array_slice($mismatches, 0, 3), $message);
+    }
+
+    public function testTransactionMethod(): void
+    {
+        $db = static::dbProvider();
+        $row = fn(string $name) => ['name' => $name, 'dob' => '2000-01-01', 'weight' => 1, 'is_disabled' => false];
+
+        // the changes are committed, and the function's return value is returned
+        $result = $db->transaction(function (PeachySql $db) use ($row) {
+            $db->insertRow($this->table, $row('committed'));
+            return 'result';
+        });
+
+        $this->assertSame('result', $result);
+        $this->assertSame(1, $this->countUsersNamed('committed'));
+
+        // an exception rolls back the changes, and is rethrown
+        $exception = new \Exception('Transaction test');
+        $thrown = null;
+
+        try {
+            $db->transaction(function (PeachySql $db) use ($row, $exception) {
+                $db->insertRow($this->table, $row('rolled back'));
+                throw $exception;
+            });
+        } catch (\Exception $e) {
+            $thrown = $e;
+        }
+
+        $this->assertSame($exception, $thrown);
+        $this->assertSame(0, $this->countUsersNamed('rolled back'));
+
+        // a nested transaction uses a savepoint, so only its own changes are rolled back
+        $db->transaction(function (PeachySql $db) use ($row) {
+            $db->insertRow($this->table, $row('outer'));
+
+            try {
+                $db->transaction(function (PeachySql $db) use ($row) {
+                    $db->insertRow($this->table, $row('inner'));
+                    $db->insertRow($this->table, [...$row('invalid'), 'name' => null]);
+                });
+
+                $this->fail('Nested transaction failed to throw exception');
+            } catch (SqlException $e) {
+                // the transaction can still be used after the error (unlike in PostgreSQL without a savepoint)
+            }
+
+            $db->insertRow($this->table, $row('outer'));
+            $db->transaction(fn(PeachySql $db) => $db->insertRow($this->table, $row('inner committed')));
+        });
+
+        $this->assertSame(2, $this->countUsersNamed('outer'));
+        $this->assertSame(0, $this->countUsersNamed('inner'));
+        $this->assertSame(1, $this->countUsersNamed('inner committed'));
+    }
+
+    public function testNestedBeginCommitRollback(): void
+    {
+        $db = static::dbProvider();
+        $row = fn(string $name) => ['name' => $name, 'dob' => '2000-01-01', 'weight' => 1, 'is_disabled' => false];
+
+        $db->begin();
+        $db->insertRow($this->table, $row('nested outer'));
+
+        // a nested rollback only rolls back the changes since the nested begin()
+        $db->begin();
+        $db->insertRow($this->table, $row('nested rolled back'));
+        $db->rollback();
+        $db->insertRow($this->table, $row('nested outer'));
+
+        // nested commits keep their changes as part of the outer transaction
+        $db->begin();
+        $db->insertRow($this->table, $row('nested committed'));
+        $db->begin();
+        $db->insertRow($this->table, $row('nested committed'));
+        $db->commit();
+        $db->commit();
+        $db->transaction(fn(PeachySql $db) => $db->insertRow($this->table, $row('nested committed')));
+
+        $db->commit();
+        $this->assertSame(2, $this->countUsersNamed('nested outer'));
+        $this->assertSame(0, $this->countUsersNamed('nested rolled back'));
+        $this->assertSame(3, $this->countUsersNamed('nested committed'));
+
+        // the transaction was committed, so this starts a new one
+        $db->begin();
+        $db->insertRow($this->table, $row('nested discarded'));
+        $db->rollback();
+        $this->assertSame(0, $this->countUsersNamed('nested discarded'));
+    }
+
+    public function testNestedRollbackAfterTransactionRolledBack(): void
+    {
+        // use a separate connection, so the transaction can be rolled back directly to simulate a deadlock
+        $conn = static::createConnection();
+        $db = new PeachySql($conn);
+        $db->begin();
+        $db->begin();
+        $conn->exec('ROLLBACK');
+
+        try {
+            $db->rollback();
+            $this->fail('Nested rollback failed to throw exception');
+        } catch (TransactionRolledBackException $e) {
+            $this->assertInstanceOf(SqlException::class, $e->getPrevious());
+        }
+    }
+
+    /**
+     * If an error in a nested transaction rolled back the entire transaction (e.g. a deadlock with SQL Server
+     * or MySQL), an exception is thrown so the outer transaction doesn't continue as if it hadn't.
+     */
+    public function testNestedTransactionRolledBack(): void
+    {
+        // use a separate connection, so the transaction can be rolled back directly to simulate a deadlock
+        $conn = static::createConnection();
+        $db = new PeachySql($conn);
+        $row = ['name' => 'rolled back by error', 'dob' => '2000-01-01', 'weight' => 1, 'is_disabled' => false];
+        $exception = new \Exception('Simulated deadlock');
+        $thrown = null;
+
+        try {
+            $db->transaction(function (PeachySql $db) use ($conn, $row, $exception) {
+                $db->insertRow($this->table, $row);
+
+                $db->transaction(function () use ($conn, $exception) {
+                    $conn->exec('ROLLBACK');
+                    throw $exception;
+                });
+            });
+        } catch (TransactionRolledBackException $e) {
+            $thrown = $e;
+        }
+
+        $this->assertSame($exception, $thrown->getPrevious());
+        $this->assertSame(0, $this->countUsersNamed('rolled back by error'));
     }
 
     public function testTransactions(): void

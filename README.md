@@ -230,8 +230,7 @@ $ids = $result->ids; // e.g. [64, 66, 68]
 > or thousands of rows at a time. To avoid these limits, the `insertRows()` method automatically
 > splits row sets that exceed the limits into chunks to efficiently insert any number of rows
 > (`queryCount` contains the number of required queries). When multiple queries are required, they
-> are run in a transaction unless one has already been started, so that if one of them fails, none
-> of the rows are inserted.
+> are run with `transaction()`, so that if one of them fails, none of the rows are inserted.
 
 #### updateRows and deleteFrom
 
@@ -253,7 +252,7 @@ $userTable->deleteFrom('Users', ['user_id' => [1, 2, 3]]);
 
 If a query would have more bound parameters than the database allows (e.g. when deleting thousands
 of rows by ID), the largest list of values to match is split into chunks, and the chunks are updated
-or deleted in separate queries. These are run in a transaction unless one has already been started.
+or deleted in separate queries. These are run with `transaction()` (see below), so they succeed or fail together.
 A list can only be split if it's for an `eq` condition (since the other list operators have to match
 all the values in one query), and isn't for a column being set to a non-null value (since an updated
 row could then match a later chunk). If no list can be split, an exception is thrown.
@@ -263,6 +262,35 @@ row could then match a later chunk). If no list can be split, an exception is th
 Call the `begin()` method to start a transaction. `prepare()`, `execute()`, `query()`
 and any of the shorthand methods can then be called as needed, before committing
 or rolling back the transaction with `commit()` or `rollback()`.
+
+Alternatively, pass a function to the `transaction()` method. The transaction is committed if the
+function returns (and its return value is returned), or rolled back if it throws an exception
+(which is then rethrown):
+
+```php
+$userId = $db->transaction(function (PeachySql $db) use ($userData, $roles) {
+    $userId = $db->insertRow('Users', $userData)->id;
+    $db->insertRows('UserRoles', array_map(fn($role) => ['user_id' => $userId, 'role' => $role], $roles));
+    return $userId;
+});
+```
+
+Transactions can be nested. If a transaction has already been started, `begin()` (and therefore
+`transaction()`) creates a savepoint instead, and the matching `commit()` or `rollback()` only
+applies to the changes made since then. So if a nested function passed to `transaction()` throws
+an exception, only the changes it made are rolled back, and the outer transaction can continue.
+
+However, some errors roll back the entire transaction (e.g. a deadlock with SQL Server or MySQL).
+In this case the nested `commit()` or `rollback()` throws a `TransactionRolledBackException`, since
+the outer transaction's changes were also rolled back. When thrown by `transaction()`, the original
+exception is available from `getPrevious()`.
+
+> [!NOTE]
+> Nested transactions are tracked by the `PeachySql` instance, so use a single instance for each
+> connection. A transaction can be started directly with PDO (e.g. to wrap a test so its changes
+> are rolled back afterwards), and `begin()` will then create savepoints within it. However, any
+> nested transactions should be ended with `commit()` or `rollback()` before the outer transaction
+> is committed or rolled back with PDO.
 
 ### Binary columns
 

@@ -12,13 +12,13 @@ class SqlException extends \RuntimeException
      */
     private readonly string $sqlState;
 
-    public function __construct(string $message, int $code, string $details, string $sqlState)
+    public function __construct(string $message, int $code, string $details, string $sqlState, ?\Throwable $previous = null)
     {
         if ($details !== '') {
             $message .= ": $details";
         }
 
-        parent::__construct($message, $code);
+        parent::__construct($message, $code, $previous);
         $this->sqlState = $sqlState;
     }
 
