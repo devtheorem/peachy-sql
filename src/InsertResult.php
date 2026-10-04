@@ -8,7 +8,7 @@ namespace DevTheorem\PeachySQL;
 class InsertResult
 {
     /**
-     * @param int $id The ID of the inserted row (0 if the row doesn't have an auto-incremented ID)
+     * @param int $id The ID of the inserted row (only supported for integer ID columns)
      * @param int $affected The number of affected rows
      */
     public function __construct(

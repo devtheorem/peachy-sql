@@ -331,7 +331,7 @@ class PeachySql
     /**
      * Inserts one row
      * @param ColValues $colVals
-     * @param string|null $idColumn The identity column, to return the ID from the insert query with PostgreSQL
+     * @param string|null $idColumn The integer identity column, to return the ID from the insert query with PostgreSQL
      *                              (the ID otherwise comes from lastval(), which may be for a different sequence)
      */
     public function insertRow(string $table, array $colVals, ?string $idColumn = null): InsertResult
@@ -345,7 +345,7 @@ class PeachySql
      * Insert multiple rows
      * @param list<ColValues> $colVals
      * @param int $identityIncrement Used to compute the IDs when they aren't returned by the insert query
-     * @param string|null $idColumn The identity column, to return the IDs from the insert query with SQL Server
+     * @param string|null $idColumn The integer identity column, to return the IDs from the insert query with SQL Server
      *                              and PostgreSQL. Unlike computing the IDs from the last insert ID, this is
      *                              correct if other sessions insert concurrently.
      */

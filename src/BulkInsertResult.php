@@ -8,7 +8,7 @@ namespace DevTheorem\PeachySQL;
 class BulkInsertResult
 {
     /**
-     * @param list<int> $ids The IDs of the inserted rows
+     * @param list<int> $ids The IDs of the inserted rows (only supported for integer ID columns)
      * @param int $affected The number of affected rows
      * @param int $queryCount The number of individual queries used to perform the bulk insert
      */
