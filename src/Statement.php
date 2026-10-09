@@ -77,17 +77,25 @@ class Statement
                 throw PeachySql::getError('Failed to fetch row', $stmt->errorInfo());
             }
 
-            // Without the exception error mode, fetch() returns false on error just like when there are no more rows.
-            // SQLSTATE classes 00, 01, and 02 indicate success, a warning, and no data, respectively.
-            $sqlState = (string) $stmt->errorCode();
+            $this->finishFetch($stmt);
+        }
+    }
 
-            if (!in_array(substr($sqlState, 0, 2), ['', '00', '01', '02'], true)) {
-                throw PeachySql::getError('Failed to fetch row', $stmt->errorInfo());
-            }
+    /**
+     * Throws if fetching rows failed without an exception, and closes the statement if it wasn't prepared.
+     */
+    private function finishFetch(PDOStatement $stmt): void
+    {
+        // Without the exception error mode, fetching returns false on error just like when there are no more rows.
+        // SQLSTATE classes 00, 01, and 02 indicate success, a warning, and no data, respectively.
+        $sqlState = (string) $stmt->errorCode();
 
-            if (!$this->usedPrepare) {
-                $this->close();
-            }
+        if (!in_array(substr($sqlState, 0, 2), ['', '00', '01', '02'], true)) {
+            throw PeachySql::getError('Failed to fetch row', $stmt->errorInfo());
+        }
+
+        if (!$this->usedPrepare) {
+            $this->close();
         }
     }
 
@@ -111,7 +119,7 @@ class Statement
      */
     public function getAll(): array
     {
-        return iterator_to_array($this->getIterator(), false);
+        return $this->fetchAll(PDO::FETCH_ASSOC);
     }
 
     /**
@@ -128,6 +136,39 @@ class Statement
         }
 
         return $row;
+    }
+
+    /**
+     * Returns the values of the first selected column from every row. This is faster and uses
+     * less memory than calling `array_column()` on the result of `getAll()`.
+     * @return list<mixed>
+     */
+    final public function getColumn(): array
+    {
+        return $this->fetchAll(PDO::FETCH_COLUMN, 0);
+    }
+
+    /**
+     * Fetches all remaining rows in a single call, which is faster than fetching them one at a time.
+     * @return ($mode is PDO::FETCH_ASSOC ? list<mixed[]> : list<mixed>)
+     */
+    private function fetchAll(int $mode, mixed ...$args): array
+    {
+        $stmt = $this->stmt;
+
+        if ($stmt === null) {
+            return [];
+        }
+
+        try {
+            /** @var list<mixed> $rows */
+            $rows = $stmt->fetchAll($mode, ...$args);
+        } catch (PDOException $e) {
+            throw PeachySql::getError('Failed to fetch row', $stmt->errorInfo());
+        }
+
+        $this->finishFetch($stmt);
+        return $rows;
     }
 
     /**

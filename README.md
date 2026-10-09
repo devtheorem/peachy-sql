@@ -62,11 +62,13 @@ Both `prepare()` and `query()` return a `Statement` object with the following me
 | `getIterator()` | Returns a `Generator` object which can be used to iterate over large result sets without caching them in memory. |
 | `getAll()`      | Returns all selected rows as an array of associative arrays.                                                     |
 | `getFirst()`    | Returns the first selected row as an associative array (or `null` if no rows were selected).                     |
+| `getColumn()`   | Returns a list of the first selected column's values from every row.                                             |
 | `getAffected()` | Returns the number of rows affected by the query.                                                                |
 | `close()`       | Closes the prepared statement and frees its resources (automatically called when using `query()`).               |
 
-Internally, `getAll()` and `getFirst()` are implemented using `getIterator()`.
-As such they can only be called once for a given statement.
+`getIterator()`, `getAll()`, `getFirst()`, and `getColumn()` all consume the selected rows,
+so only one of them can be called each time a statement is executed. `getColumn()` is faster and
+uses less memory than calling `array_column()` on the result of `getAll()`.
 
 ### Shorthand methods
 

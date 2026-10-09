@@ -726,4 +726,37 @@ abstract class DbTestCase extends TestCase
         $numDeleted = $peachySql->deleteFrom($this->table, ['user_id' => $id]);
         $this->assertSame(1, $numDeleted);
     }
+
+    public function testGetColumn(): void
+    {
+        $peachySql = static::dbProvider();
+        $rows = [
+            ['name' => 'Column A', 'dob' => '2001-02-03', 'weight' => 10, 'is_disabled' => false],
+            ['name' => 'Column B', 'dob' => '2002-03-04', 'weight' => 20, 'is_disabled' => true],
+            ['name' => 'Column C', 'dob' => '2003-04-05', 'weight' => 30, 'is_disabled' => false],
+        ];
+        $ids = $peachySql->insertRows($this->table, $rows)->ids;
+        $select = fn(string $cols) => $peachySql->selectFrom("SELECT {$cols} FROM {$this->table}")
+            ->where(['user_id' => $ids])->orderBy(['user_id'])->query();
+
+        // only the first selected column is returned
+        $this->assertSame($ids, $select('user_id, name')->getColumn());
+        $this->assertSame(['Column A', 'Column B', 'Column C'], $select('name, user_id')->getColumn());
+        $this->assertSame([null, null, null], $select('uuid')->getColumn());
+
+        $noRows = $peachySql->selectFrom("SELECT name FROM {$this->table}")->where(['user_id' => 0])->query();
+        $this->assertSame([], $noRows->getColumn());
+
+        // prepared statements can be executed again after getting the column
+        $_id = null;
+        $stmt = $peachySql->prepare("SELECT name FROM {$this->table} WHERE user_id = ?", [&$_id]);
+
+        foreach ($ids as $i => $_id) {
+            $stmt->execute();
+            $this->assertSame([$rows[$i]['name']], $stmt->getColumn());
+        }
+
+        $stmt->close();
+        $this->assertSame(3, $peachySql->deleteFrom($this->table, ['user_id' => $ids]));
+    }
 }

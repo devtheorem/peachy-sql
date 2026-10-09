@@ -1,5 +1,15 @@
 # Changelog
 
+## [7.2.0] - 2026-10-09
+### Added
+- `Statement::getColumn()` method, which returns a list of the first selected column's values from every row.
+  This is faster and uses less memory than calling `array_column()` on the result of `getAll()`.
+
+### Changed
+- Improved the performance of `getAll()` by fetching rows with a single `fetchAll()` call rather than
+  through `getIterator()`.
+
+
 ## [7.1.0] - 2026-09-29
 ### Added
 - Optional `idColumn` parameter for `insertRow()` and `insertRows()`. With SQL Server and PostgreSQL,
@@ -395,6 +405,7 @@ return the value of their callback function, making it easier to use data outsid
 - Initial release
 
 
+[7.2.0]: https://github.com/devtheorem/peachy-sql/compare/v7.1.0...v7.2.0
 [7.1.0]: https://github.com/devtheorem/peachy-sql/compare/v7.0.2...v7.1.0
 [7.0.2]: https://github.com/devtheorem/peachy-sql/compare/v7.0.1...v7.0.2
 [7.0.1]: https://github.com/devtheorem/peachy-sql/compare/v7.0.0...v7.0.1
